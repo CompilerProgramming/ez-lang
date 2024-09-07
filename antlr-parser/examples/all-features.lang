@@ -1,0 +1,30 @@
+struct Tree {
+    var left: Tree?
+    var right: Tree?
+}
+struct Test {
+    var intArray: [Int]
+}
+struct TreeArray {
+    var array: [Tree?]?
+}
+func print(n: Int) {}
+func foo(a: Int, b: [Int]) {
+    while(1) {
+        if (a > b.length)
+            break
+        print(b[a])
+        a = a + 1
+        a = a + 2
+    }
+}
+func bar() -> Test {
+    var v = new Test { intArray = new [Tree] {} }
+    return v
+}
+func main() {
+    var m = 42
+    var t: Tree
+    var b = true
+    var c: Bool
+}
