@@ -6,13 +6,14 @@ import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
 import com.compilerprogramming.ezlang.semantic.SemaDefineTypes;
 import com.compilerprogramming.ezlang.types.Symbol;
 import com.compilerprogramming.ezlang.types.TypeDictionary;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.BitSet;
 
 public class TestCompiler {
 
-    void compileSrc(String src, String functionName) {
+    String compileSrc(String src) {
         Parser parser = new Parser();
         var program = parser.parse(new Lexer(src));
         var typeDict = new TypeDictionary();
@@ -22,12 +23,14 @@ public class TestCompiler {
         sema2.analyze(program);
         RegisterVMCompiler byteCodeCompiler = new RegisterVMCompiler();
         byteCodeCompiler.compile(typeDict);
+        StringBuilder sb = new StringBuilder();
         for (Symbol s: typeDict.bindings.values()) {
             if (s instanceof Symbol.FunctionTypeSymbol f) {
                 var functionBuilder = (FunctionBuilder) f.code;
-                System.out.println(BasicBlock.toStr(new StringBuilder(), functionBuilder.entry, new BitSet()));
+                BasicBlock.toStr(sb, functionBuilder.entry, new BitSet());
             }
         }
+        return sb.toString();
     }
 
     @Test
@@ -37,7 +40,13 @@ public class TestCompiler {
                     return 1;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+        Assert.assertEquals("""
+                L0:
+                \tRET = 1
+                \tgoto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -47,7 +56,13 @@ public class TestCompiler {
                     return -1;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+        Assert.assertEquals("""
+                L0:
+                \tRET = -1
+                \tgoto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -57,7 +72,13 @@ public class TestCompiler {
                     return n;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+        Assert.assertEquals("""
+                L0:
+                \tRET = Local{0}
+                \tgoto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -67,7 +88,8 @@ public class TestCompiler {
                     return -n;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -77,7 +99,8 @@ public class TestCompiler {
                     return n+1;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
     @Test
     public void testFunction6() {
@@ -86,7 +109,8 @@ public class TestCompiler {
                     return 1+1;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
     @Test
     public void testFunction7() {
@@ -95,7 +119,8 @@ public class TestCompiler {
                     return 1+1-1;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
     @Test
     public void testFunction8() {
@@ -104,7 +129,8 @@ public class TestCompiler {
                     return 2==2;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
     @Test
     public void testFunction9() {
@@ -113,7 +139,8 @@ public class TestCompiler {
                     return 1!=1;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -123,7 +150,8 @@ public class TestCompiler {
                     return n[0];
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -133,7 +161,8 @@ public class TestCompiler {
                     return n[0]+n[1];
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -143,7 +172,8 @@ public class TestCompiler {
                     return new [Int] { 1, 2, 3 };
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -153,7 +183,8 @@ public class TestCompiler {
                     return new [Int] { n };
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -163,7 +194,8 @@ public class TestCompiler {
                     return x+y;
                 }
                 """;
-        compileSrc(src, "add");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -178,7 +210,8 @@ public class TestCompiler {
                     p.age = 10;
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -193,7 +226,8 @@ public class TestCompiler {
                     return new Person { age=10, children=0 };
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -204,7 +238,8 @@ public class TestCompiler {
                     array[1] = 2
                 }
                 """;
-        compileSrc(src, "foo");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -216,7 +251,8 @@ public class TestCompiler {
                     return y;
                 }
                 """;
-        compileSrc(src, "min");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -228,7 +264,8 @@ public class TestCompiler {
                     return;
                 }
                 """;
-        compileSrc(src, "loop");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -240,7 +277,8 @@ public class TestCompiler {
                     return;
                 }
                 """;
-        compileSrc(src, "loop");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -253,7 +291,8 @@ public class TestCompiler {
                     return;
                 }
                 """;
-        compileSrc(src, "loop");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -262,7 +301,8 @@ public class TestCompiler {
                 func foo() {}
                 func bar() { foo(); }
                 """;
-        compileSrc(src, "bar");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -271,7 +311,8 @@ public class TestCompiler {
                 func foo(x: Int, y: Int) {}
                 func bar() { foo(1,2); }
                 """;
-        compileSrc(src, "bar");
+        String result = compileSrc(src);
+
     }
 
     @Test
@@ -280,6 +321,80 @@ public class TestCompiler {
                 func foo(x: Int, y: Int)->Int { return x+y; }
                 func bar()->Int { var t = foo(1,2); return t+1; }
                 """;
-        compileSrc(src, "bar");
+        String result = compileSrc(src);
+
+    }
+
+    @Test
+    public void testFunction22() {
+        String src = """
+                struct Person
+                {
+                    var age: Int
+                    var children: Int
+                }
+                func foo(p: Person) -> Int {
+                    return p.age;
+                }
+                """;
+        String result = compileSrc(src);
+
+    }
+
+    @Test
+    public void testFunction23() {
+        String src = """
+                struct Person
+                {
+                    var age: Int
+                    var parent: Person
+                }
+                func foo(p: Person) -> Int {
+                    return p.parent.age;
+                }
+                """;
+        String result = compileSrc(src);
+
+    }
+
+    @Test
+    public void testFunction24() {
+        String src = """
+                struct Person
+                {
+                    var age: Int
+                    var parent: Person
+                }
+                func foo(p: [Person], i: Int) -> Int {
+                    return p[i].parent.age;
+                }
+                """;
+        String result = compileSrc(src);
+
+    }
+    @Test
+    public void testFunction25() {
+        String src = """
+                func foo(x: Int, y: Int)->Int { return x+y; }
+                func bar(a: Int)->Int { var t = foo(a,2); return t+1; }
+                """;
+        String result = compileSrc(src);
+        Assert.assertEquals("""
+                L0:
+                \tT0 = Local{0}+Local{1}
+                \tRET = T0
+                \tgoto  L1
+                L1:
+                L0:
+                \tT0 = foo
+                \tT1 = Local{0}
+                \tT2 = 2
+                \tT0(T1, T2)
+                \tLocal{1} = T0
+                \tT0 = Local{1}+1
+                \tRET = T0
+                \tgoto  L1
+                L1:
+                """, result);
     }
 }

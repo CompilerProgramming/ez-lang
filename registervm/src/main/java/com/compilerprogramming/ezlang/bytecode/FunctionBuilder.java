@@ -70,9 +70,7 @@ public class FunctionBuilder {
 
     private void compileReturn(AST.ReturnStmt returnStmt) {
         if (returnStmt.expr != null) {
-            boolean indexed = compileExpr(returnStmt.expr);
-            if (indexed)
-                codeIndexedLoad();
+            compileExpr(returnStmt.expr);
             if (virtualStack.size() == 1)
                 code(new Instruction.Move(pop(), new Operand.ReturnRegisterOperand()));
             else if (virtualStack.size() > 1)
