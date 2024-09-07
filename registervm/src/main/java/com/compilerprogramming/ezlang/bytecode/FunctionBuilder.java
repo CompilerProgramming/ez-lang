@@ -11,14 +11,22 @@ import java.util.List;
 
 public class FunctionBuilder {
 
-    BasicBlock entry;
-    BasicBlock exit;
-    int bid = 0;
-    BasicBlock currentBlock;
-    BasicBlock currentBreakTarget;
-    BasicBlock currentContinueTarget;
+    public BasicBlock entry;
+    public BasicBlock exit;
+    private int bid = 0;
+    private BasicBlock currentBlock;
+    private BasicBlock currentBreakTarget;
+    private BasicBlock currentContinueTarget;
 
-    List<Operand> virtualStack = new ArrayList<>();
+    /**
+     * We essentially do a form of abstract interpretation as we generate
+     * the bytecode instructions. For this purpose we use a virtual operand stack.
+     *
+     * This is similar to the technique described in
+     * Dynamic Optimization through the use of Automatic Runtime Specialization
+     * by John Whaley
+     */
+    private List<Operand> virtualStack = new ArrayList<>();
 
     public FunctionBuilder(Symbol.FunctionTypeSymbol functionSymbol) {
         AST.FuncDecl funcDecl = (AST.FuncDecl) functionSymbol.functionDecl;
@@ -66,7 +74,7 @@ public class FunctionBuilder {
             if (indexed)
                 codeIndexedLoad();
             if (virtualStack.size() == 1)
-                code(new Instruction.Move(pop(), new Operand.ReturnRegisterOperand(0)));
+                code(new Instruction.Move(pop(), new Operand.ReturnRegisterOperand()));
             else if (virtualStack.size() > 1)
                 throw new CompilerException("Virtual stack has more than one item at return");
         }

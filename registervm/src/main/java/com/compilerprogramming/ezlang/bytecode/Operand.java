@@ -37,17 +37,22 @@ public class Operand {
         }
     }
 
+    /**
+     * Represents the return register, which is the location where
+     * the caller will expect to see any return value. The VM must map
+     * this to appropriate location.
+     */
     public static class ReturnRegisterOperand extends Operand {
-        public final int regnum;
-        public ReturnRegisterOperand(int regnum) {
-            this.regnum = regnum;
-        }
+        public ReturnRegisterOperand() {}
         @Override
-        public String toString() {
-            return "R" + regnum;
-        }
+        public String toString() { return "RET"; }
     }
 
+    /**
+     * Represents a temp register, maps to a location on the
+     * virtual stack. Temps start at offset 0, but this is a relative
+     * register number from start of temp area.
+     */
     public static class TempRegisterOperand extends Operand {
         public final int regnum;
         public TempRegisterOperand(int regnum) {
@@ -66,7 +71,6 @@ public class Operand {
             this.arrayOperand = arrayOperand;
             this.indexOperand = indexOperand;
         }
-
         @Override
         public String toString() {
             return arrayOperand + "[" + indexOperand + "]";

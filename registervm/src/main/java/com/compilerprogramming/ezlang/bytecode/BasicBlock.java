@@ -7,8 +7,8 @@ import java.util.List;
 public class BasicBlock {
     public final int bid;
     public final boolean loopHead;
-    public List<BasicBlock> successors = new ArrayList<>(); // successors
-    List<BasicBlock> predecessors = new ArrayList<>();
+    public final List<BasicBlock> successors = new ArrayList<>(); // successors
+    public final List<BasicBlock> predecessors = new ArrayList<>();
     public final List<Instruction> instructions = new ArrayList<>();
 
     public BasicBlock(int bid, boolean loopHead) {
@@ -25,7 +25,6 @@ public class BasicBlock {
         successors.add(successor);
         successor.predecessors.add(this);
     }
-
     public static StringBuilder toStr(StringBuilder sb, BasicBlock bb, BitSet visited)
     {
         if (visited.get(bb.bid))
@@ -41,5 +40,4 @@ public class BasicBlock {
         }
         return sb;
     }
-
 }
