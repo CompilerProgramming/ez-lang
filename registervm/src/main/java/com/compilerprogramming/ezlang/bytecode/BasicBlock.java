@@ -32,7 +32,7 @@ public class BasicBlock {
         visited.set(bb.bid);
         sb.append("L").append(bb.bid).append(":\n");
         for (Instruction n: bb.instructions) {
-            sb.append("\t");
+            sb.append("    ");
             n.toStr(sb).append("\n");
         }
         for (BasicBlock succ: bb.successors) {
@@ -40,4 +40,5 @@ public class BasicBlock {
         }
         return sb;
     }
+
 }

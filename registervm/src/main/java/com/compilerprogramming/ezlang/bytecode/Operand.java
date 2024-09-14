@@ -17,12 +17,14 @@ public class Operand {
 
     public static class LocalRegisterOperand extends Operand {
         public final int regnum;
-        public LocalRegisterOperand(int regnum) {
+        public final String varName;
+        public LocalRegisterOperand(int regnum, String varName) {
             this.regnum = regnum;
+            this.varName = varName;
         }
         @Override
         public String toString() {
-            return "Local{" + regnum + '}';
+            return varName;
         }
     }
 
@@ -45,7 +47,7 @@ public class Operand {
     public static class ReturnRegisterOperand extends Operand {
         public ReturnRegisterOperand() {}
         @Override
-        public String toString() { return "RET"; }
+        public String toString() { return "%ret"; }
     }
 
     /**
@@ -60,7 +62,7 @@ public class Operand {
         }
         @Override
         public String toString() {
-            return "T" + regnum;
+            return "%t" + regnum;
         }
     }
 
@@ -89,7 +91,7 @@ public class Operand {
 
         @Override
         public String toString() {
-            return structOperand + "." + fieldName + "(" + fieldIndex + ")";
+            return structOperand + "." + fieldName;
         }
     }
 

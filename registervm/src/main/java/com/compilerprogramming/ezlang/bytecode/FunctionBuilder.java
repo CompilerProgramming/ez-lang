@@ -37,6 +37,14 @@ public class FunctionBuilder {
         this.currentBreakTarget = null;
         this.currentContinueTarget = null;
         compileStatement(funcDecl.block);
+        exitBlockIfNeeded();
+    }
+
+    private void exitBlockIfNeeded() {
+        if (currentBlock != null &&
+                currentBlock != exit) {
+            startBlock(exit);
+        }
     }
 
     private void setVirtualRegisters(Scope scope) {
@@ -127,7 +135,7 @@ public class FunctionBuilder {
             codeIndexedStore();
         else if (assignStmt.lhs instanceof AST.NameExpr symbolExpr) {
             Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) symbolExpr.symbol;
-            code(new Instruction.Move(pop(), new Operand.LocalRegisterOperand(varSymbol.reg)));
+            code(new Instruction.Move(pop(), new Operand.LocalRegisterOperand(varSymbol.reg, varSymbol.name)));
         }
         else
             throw new CompilerException("Invalid assignment expression: " + assignStmt.lhs);
@@ -182,7 +190,8 @@ public class FunctionBuilder {
     }
 
     private void jumpTo(BasicBlock block) {
-        currentBlock.add(new Instruction.Jump(currentBlock, block));
+        assert !isBlockTerminated(currentBlock);
+        currentBlock.add(new Instruction.Jump(block));
         currentBlock.addSuccessor(block);
     }
 
@@ -221,7 +230,7 @@ public class FunctionBuilder {
             boolean indexed = compileExpr(letStmt.expr);
             if (indexed)
                 codeIndexedLoad();
-            code(new Instruction.Move(pop(), new Operand.LocalRegisterOperand(letStmt.symbol.reg)));
+            code(new Instruction.Move(pop(), new Operand.LocalRegisterOperand(letStmt.symbol.reg, letStmt.symbol.name)));
         }
     }
 
@@ -373,7 +382,7 @@ public class FunctionBuilder {
             pushOperand(new Operand.LocalFunctionOperand(functionType));
         else {
             Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) symbolExpr.symbol;
-            pushLocal(varSymbol.reg);
+            pushLocal(varSymbol.reg, varSymbol.name);
         }
         return false;
     }
@@ -429,13 +438,9 @@ public class FunctionBuilder {
                 default: throw new CompilerException("Invalid unary op");
             }
         }
-        else if (top instanceof Operand.LocalRegisterOperand) {
-            code(new Instruction.UnaryInstruction(opCode, top));
-        }
         else {
             var temp = createTemp();
-            code(new Instruction.Move(top, temp));
-            code(new Instruction.UnaryInstruction(opCode, temp));
+            code(new Instruction.UnaryInstruction(opCode, temp, top));
         }
         return false;
     }
@@ -455,8 +460,8 @@ public class FunctionBuilder {
         return tempRegister;
     }
 
-    private void pushLocal(int regnum) {
-        virtualStack.add(new Operand.LocalRegisterOperand(regnum));
+    private void pushLocal(int regnum, String varName) {
+        virtualStack.add(new Operand.LocalRegisterOperand(regnum, varName));
     }
 
     private void pushOperand(Operand operand) {

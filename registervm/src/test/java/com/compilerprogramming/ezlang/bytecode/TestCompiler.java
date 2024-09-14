@@ -43,8 +43,8 @@ public class TestCompiler {
         String result = compileSrc(src);
         Assert.assertEquals("""
                 L0:
-                \tRET = 1
-                \tgoto  L1
+                    %ret = 1
+                    goto  L1
                 L1:
                 """, result);
     }
@@ -59,8 +59,8 @@ public class TestCompiler {
         String result = compileSrc(src);
         Assert.assertEquals("""
                 L0:
-                \tRET = -1
-                \tgoto  L1
+                    %ret = -1
+                    goto  L1
                 L1:
                 """, result);
     }
@@ -75,8 +75,8 @@ public class TestCompiler {
         String result = compileSrc(src);
         Assert.assertEquals("""
                 L0:
-                \tRET = Local{0}
-                \tgoto  L1
+                    %ret = n
+                    goto  L1
                 L1:
                 """, result);
     }
@@ -89,7 +89,13 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = -n
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -100,7 +106,13 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = n+1
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
     @Test
     public void testFunction6() {
@@ -110,7 +122,12 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %ret = 2
+                    goto  L1
+                L1:
+                """, result);
     }
     @Test
     public void testFunction7() {
@@ -120,7 +137,12 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %ret = 1
+                    goto  L1
+                L1:
+                """, result);
     }
     @Test
     public void testFunction8() {
@@ -130,7 +152,12 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %ret = 1
+                    goto  L1
+                L1:
+                """, result);
     }
     @Test
     public void testFunction9() {
@@ -140,7 +167,12 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %ret = 0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -151,7 +183,12 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %ret = n[0]
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -162,7 +199,15 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = n[0]
+                    %t1 = n[1]
+                    %t0 = %t0+%t1
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -173,7 +218,16 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = New([Int,Int])
+                    %t0.append(1)
+                    %t0.append(2)
+                    %t0.append(3)
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -184,7 +238,14 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = New([Int,Int])
+                    %t0.append(n)
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
@@ -195,11 +256,17 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = x+y
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction14a() {
+    public void testFunction15() {
         String src = """
                 struct Person
                 {
@@ -211,11 +278,16 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    p.age = 10
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction14b() {
+    public void testFunction16() {
         String src = """
                 struct Person
                 {
@@ -227,11 +299,19 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = New(Person)
+                    %t0.age = 10
+                    %t0.children = 0
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction14c() {
+    public void testFunction17() {
         String src = """
                 func foo(array: [Int]) {
                     array[0] = 1
@@ -239,11 +319,17 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    array[0] = 1
+                    array[1] = 2
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction15() {
+    public void testFunction18() {
         String src = """
                 func min(x: Int, y: Int) -> Int {
                     if (x < y)
@@ -252,11 +338,22 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = x<y
+                    if %t0 goto L2 else goto L3
+                L2:
+                    %ret = x
+                    goto  L1
+                L1:
+                L3:
+                    %ret = y
+                    goto  L1
+                """, result);
     }
 
     @Test
-    public void testFunction16() {
+    public void testFunction19() {
         String src = """
                 func loop() {
                     while (1)
@@ -265,11 +362,21 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    goto  L2
+                L2:
+                    if 1 goto L3 else goto L4
+                L3:
+                    goto  L1
+                L1:
+                L4:
+                    goto  L1
+                """, result);
     }
 
     @Test
-    public void testFunction17() {
+    public void testFunction20() {
         String src = """
                 func loop() {
                     while (1)
@@ -278,11 +385,21 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    goto  L2
+                L2:
+                    if 1 goto L3 else goto L4
+                L3:
+                    goto  L4
+                L4:
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction18() {
+    public void testFunction21() {
         String src = """
                 func loop(n: Int) {
                     while (n > 0) {
@@ -292,41 +409,90 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    goto  L2
+                L2:
+                    %t0 = n>0
+                    if %t0 goto L3 else goto L4
+                L3:
+                    %t0 = n-1
+                    n = %t0
+                    goto  L2
+                L4:
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction19() {
+    public void testFunction22() {
         String src = """
                 func foo() {}
                 func bar() { foo(); }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    goto  L1
+                L1:
+                L0:
+                    %t0 = foo
+                    call %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction20() {
+    public void testFunction23() {
         String src = """
                 func foo(x: Int, y: Int) {}
                 func bar() { foo(1,2); }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    goto  L1
+                L1:
+                L0:
+                    %t0 = foo
+                    %t1 = 1
+                    %t2 = 2
+                    call %t0 params %t1, %t2
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction21() {
+    public void testFunction24() {
         String src = """
                 func foo(x: Int, y: Int)->Int { return x+y; }
                 func bar()->Int { var t = foo(1,2); return t+1; }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = x+y
+                    %ret = %t0
+                    goto  L1
+                L1:
+                L0:
+                    %t0 = foo
+                    %t1 = 1
+                    %t2 = 2
+                    call %t0 params %t1, %t2
+                    t = %t0
+                    %t0 = t+1
+                    %ret = %t0
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction22() {
+    public void testFunction25() {
         String src = """
                 struct Person
                 {
@@ -338,11 +504,16 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %ret = p.age
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction23() {
+    public void testFunction26() {
         String src = """
                 struct Person
                 {
@@ -354,11 +525,17 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = p.parent
+                    %ret = %t0.age
+                    goto  L1
+                L1:
+                """, result);
     }
 
     @Test
-    public void testFunction24() {
+    public void testFunction27() {
         String src = """
                 struct Person
                 {
@@ -370,10 +547,17 @@ public class TestCompiler {
                 }
                 """;
         String result = compileSrc(src);
-
+        Assert.assertEquals("""
+                L0:
+                    %t0 = p[i]
+                    %t0 = %t0.parent
+                    %ret = %t0.age
+                    goto  L1
+                L1:
+                """, result);
     }
     @Test
-    public void testFunction25() {
+    public void testFunction28() {
         String src = """
                 func foo(x: Int, y: Int)->Int { return x+y; }
                 func bar(a: Int)->Int { var t = foo(a,2); return t+1; }
@@ -381,19 +565,19 @@ public class TestCompiler {
         String result = compileSrc(src);
         Assert.assertEquals("""
                 L0:
-                \tT0 = Local{0}+Local{1}
-                \tRET = T0
-                \tgoto  L1
+                    %t0 = x+y
+                    %ret = %t0
+                    goto  L1
                 L1:
                 L0:
-                \tT0 = foo
-                \tT1 = Local{0}
-                \tT2 = 2
-                \tT0(T1, T2)
-                \tLocal{1} = T0
-                \tT0 = Local{1}+1
-                \tRET = T0
-                \tgoto  L1
+                    %t0 = foo
+                    %t1 = a
+                    %t2 = 2
+                    call %t0 params %t1, %t2
+                    t = %t0
+                    %t0 = t+1
+                    %ret = %t0
+                    goto  L1
                 L1:
                 """, result);
     }

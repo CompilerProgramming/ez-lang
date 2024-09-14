@@ -25,14 +25,16 @@ public abstract class Instruction {
 
     public static class UnaryInstruction extends Instruction {
         public final String unop;
+        public final Operand result;
         public final Operand operand;
-        public UnaryInstruction(String unop, Operand operand) {
+        public UnaryInstruction(String unop, Operand result, Operand operand) {
             this.unop = unop;
+            this.result = result;
             this.operand = operand;
         }
         @Override
         public StringBuilder toStr(StringBuilder sb) {
-            return sb.append(operand).append(" = ").append(unop).append(operand);
+            return sb.append(result).append(" = ").append(unop).append(operand);
         }
     }
 
@@ -62,7 +64,7 @@ public abstract class Instruction {
         }
         @Override
         public StringBuilder toStr(StringBuilder sb) {
-            return sb.append("ArrayAdd(").append(array).append(", ").append(value).append(")");
+            return sb.append(array).append(".append(").append(value).append(")");
         }
     }
 
@@ -96,18 +98,20 @@ public abstract class Instruction {
         }
         @Override
         public StringBuilder toStr(StringBuilder sb) {
-            sb.append(callee).append("(");
+            sb.append("call ").append(callee);
+            if (args.length > 0)
+                sb.append(" params ");
             for (int i = 0; i < args.length; i++) {
                 if (i > 0) sb.append(", ");
                 sb.append(args[i]);
             }
-            return sb.append(")");
+            return sb;
         }
     }
 
     public static class Jump extends Instruction {
         public final BasicBlock jumpTo;
-        public Jump(BasicBlock currentBlock, BasicBlock jumpTo) {
+        public Jump(BasicBlock jumpTo) {
             this.jumpTo = jumpTo;
         }
         @Override
