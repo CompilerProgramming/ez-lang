@@ -13,13 +13,14 @@ import java.util.Objects;
 public abstract class Type {
 
     // Type classes
-    static final byte TANY = 0;
-    static final byte TNULL = 1;
-    static final byte TINT = 2;      // Int, Bool
-    static final byte TNULLABLE = 3;   // Null, or not null ptr
-    static final byte TFUNC = 4;     // Function types
-    static final byte TSTRUCT = 5;
-    static final byte TARRAY = 6;
+    static final byte TVOID = 0;
+    static final byte TANY = 1;
+    static final byte TNULL = 2;
+    static final byte TINT = 3;      // Int, Bool
+    static final byte TNULLABLE = 4;   // Null, or not null ptr
+    static final byte TFUNC = 5;     // Function types
+    static final byte TSTRUCT = 6;
+    static final byte TARRAY = 7;
 
     public final byte tclass;    // type class
     public final String name;      // type name, always unique
@@ -50,6 +51,12 @@ public abstract class Type {
         return name;
     }
     public String name() { return name; }
+
+    public static class TypeVoid extends Type {
+        public TypeVoid() {
+            super(TVOID, "$Void");
+        }
+    }
 
     /**
      * We give it the name $Any so that it cannot be referenced in
@@ -166,7 +173,7 @@ public abstract class Type {
                 sb.append(arg.name).append(": ").append(arg.type.name());
             }
             sb.append(")");
-            if (returnType != null) {
+            if (!(returnType instanceof Type.TypeVoid)) {
                 sb.append("->").append(returnType.name());
             }
             return sb.toString();

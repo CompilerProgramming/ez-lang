@@ -272,7 +272,7 @@ public class FunctionBuilder {
         var callee = top();
         if (!(callee instanceof Operand.TempRegisterOperand) ) {
             var origCallee = pop();
-            callee = createTemp();
+            callee = createTemp(origCallee.type);
             code(new Instruction.Move(origCallee, callee));
         }
         List<Operand> args = new ArrayList<>();
@@ -283,7 +283,7 @@ public class FunctionBuilder {
             var arg = top();
             if (!(arg instanceof Operand.TempRegisterOperand) ) {
                 var origArg = pop();
-                arg = createTemp();
+                arg = createTemp(origArg.type);
                 code(new Instruction.Move(origArg, arg));
             }
             args.add(arg);
@@ -293,8 +293,8 @@ public class FunctionBuilder {
         for (int i = 0; i < args.size()+1; i++)
             pop();
         if (callExpr.callee.type instanceof Type.TypeFunction tf &&
-            !(tf.returnType instanceof Type.TypeVoid))
-            createTemp();
+                !(tf.returnType instanceof Type.TypeVoid))
+            createTemp(tf.returnType);
         return false;
     }
 
@@ -347,7 +347,7 @@ public class FunctionBuilder {
     }
 
     private void codeNew(Type type) {
-        var temp = createTemp();
+        var temp = createTemp(type);
         code(new Instruction.Move(new Operand.NewTypeOperand(type), temp));
     }
 
@@ -399,7 +399,7 @@ public class FunctionBuilder {
         Operand right = pop();
         Operand left = pop();
         if (left instanceof Operand.ConstantOperand leftconstant &&
-            right instanceof Operand.ConstantOperand rightconstant) {
+                right instanceof Operand.ConstantOperand rightconstant) {
             long value = 0;
             switch (opCode) {
                 case "+": value = leftconstant.value + rightconstant.value; break;
@@ -415,10 +415,10 @@ public class FunctionBuilder {
                 case ">=": value = leftconstant.value <= rightconstant.value ? 1 : 0; break;
                 default: throw new CompilerException("Invalid binary op");
             }
-            pushConstant(value);
+            pushConstant(value, leftconstant.type);
         }
         else {
-            var temp = createTemp();
+            var temp = createTemp(binaryExpr.type);
             code(new Instruction.BinaryInstruction(opCode, temp, left, right));
         }
         return false;
@@ -433,29 +433,30 @@ public class FunctionBuilder {
         Operand top = pop();
         if (top instanceof Operand.ConstantOperand constant) {
             switch (opCode) {
-                case "-": pushConstant(-constant.value); break;
-                case "!": pushConstant(constant.value == 0?1:0); break;
+                case "-": pushConstant(-constant.value, constant.type); break;
+                // Maybe below we should explicitly set Int
+                case "!": pushConstant(constant.value == 0?1:0, constant.type); break;
                 default: throw new CompilerException("Invalid unary op");
             }
         }
         else {
-            var temp = createTemp();
+            var temp = createTemp(unaryExpr.type);
             code(new Instruction.UnaryInstruction(opCode, temp, top));
         }
         return false;
     }
 
     private boolean compileConstantExpr(AST.LiteralExpr constantExpr) {
-        pushConstant(constantExpr.value.num.intValue());
+        pushConstant(constantExpr.value.num.intValue(), constantExpr.type);
         return false;
     }
 
-    private void pushConstant(long value) {
-        virtualStack.add(new Operand.ConstantOperand(value));
+    private void pushConstant(long value, Type type) {
+        virtualStack.add(new Operand.ConstantOperand(value, type));
     }
 
-    private Operand.TempRegisterOperand createTemp() {
-        var tempRegister = new Operand.TempRegisterOperand(virtualStack.size());
+    private Operand.TempRegisterOperand createTemp(Type type) {
+        var tempRegister = new Operand.TempRegisterOperand(virtualStack.size(), type);
         virtualStack.add(tempRegister);
         return tempRegister;
     }
@@ -478,7 +479,7 @@ public class FunctionBuilder {
 
     private void codeIndexedLoad() {
         Operand indexed = pop();
-        var temp = createTemp();
+        var temp = createTemp(indexed.type);
         code(new Instruction.Move(indexed, temp));
     }
 

@@ -27,6 +27,7 @@
         <module>semantic</module>
         <module>stackvm</module>
         <module>registervm</module>
+        <module>typestatevm</module>
     </modules>
 
     <properties>

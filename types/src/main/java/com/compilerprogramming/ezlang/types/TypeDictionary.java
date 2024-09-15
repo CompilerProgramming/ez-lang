@@ -6,12 +6,14 @@ public class TypeDictionary extends Scope {
     public final Type.TypeAny ANY;
     public final Type.TypeInteger INT;
     public final Type.TypeNull NULL;
+    public final Type.TypeVoid VOID;
 
     public TypeDictionary() {
         super(null);
         INT = (Type.TypeInteger) intern(new Type.TypeInteger());
         ANY = (Type.TypeAny) intern(new Type.TypeAny());
         NULL = (Type.TypeNull) intern(new Type.TypeNull());
+        VOID = (Type.TypeVoid) intern(new Type.TypeVoid());
     }
     public Type makeArrayType(Type elementType, boolean isNullable) {
         switch (elementType) {

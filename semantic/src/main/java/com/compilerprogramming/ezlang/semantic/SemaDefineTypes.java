@@ -229,11 +229,14 @@ public class SemaDefineTypes implements ASTVisitor {
             // We override the visitor and visit the return type here because
             // we need to associate the return type to the function's return type
             // The visitor mechanism doesn't allow us to associate values between two steps
+            Type.TypeFunction type = (Type.TypeFunction) currentFuncDecl.symbol.type;
             if (returnTypeExpr.returnType != null) {
                 returnTypeExpr.returnType.accept(this);
-                Type.TypeFunction type = (Type.TypeFunction) currentFuncDecl.symbol.type;
                 returnTypeExpr.type = returnTypeExpr.returnType.type;
                 type.setReturnType(returnTypeExpr.type);
+            }
+            else {
+                type.setReturnType(typeDictionary.VOID);
             }
             visitor = null;
         }
