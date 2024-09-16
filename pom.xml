@@ -9,8 +9,8 @@
     <packaging>pom</packaging>
     <version>1.0</version>
     <name>Compiler Craft</name>
-    <description>Project to experiment with compiler techniques</description>
-    <url>https://github.com/CompilerProgramming/CompilerCraft.git</url>
+    <description>EZ (EeeZee) language project for experimenting with compiler techniques</description>
+    <url>https://github.com/CompilerProgramming/ez-lang.git</url>
     <licenses>
         <license>
             <name>Apache License Version 2.0</name>
@@ -19,7 +19,7 @@
     </licenses>
 
     <modules>
-    	<module>common</module>
+        <module>common</module>
         <module>antlr-parser</module>
         <module>lexer</module>
         <module>types</module>
