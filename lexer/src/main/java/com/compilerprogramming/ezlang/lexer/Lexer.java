@@ -1,21 +1,4 @@
-/*
- * DO NOT REMOVE COPYRIGHT NOTICES OR THIS HEADER.
- * <p>
- * Contributor(s):
- * <p>
- * The Initial Developer of the Original Software is Dibyendu Majumdar.
- * <p>
- * This file is part of the Compiler Craft project.
- * See https://github.com/dibyendumajumdar/CompilerCraft
- * <p>
- * The contents of this file are subject to the terms of the
- * Apache License Version 2 (the "APL"). You may not use this
- * file except in compliance with the License. A copy of the
- * APL may be obtained from:
- * http://www.apache.org/licenses/LICENSE-2.0
- */
 package com.compilerprogramming.ezlang.lexer;
-
 
 import com.compilerprogramming.ezlang.exceptions.CompilerException;
 
