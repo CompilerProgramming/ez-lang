@@ -158,4 +158,83 @@ public class TestNullAnalysis {
 """;
         analyze(src, "test");
     }
+
+    @Test
+    public void numericLiteralAndNonConstantArithmetic() {
+        String src = """
+    func takesInt(arg: Int) {
+    }
+    func test(a: Int, b: Int) {
+        takesInt(1);
+        takesInt(a + b);
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void nullableReturnToNonNullType() {
+        String src = """
+    struct Foo { var bar: Int }
+    func test(arg: Foo?)->Foo {
+        return arg;
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void nullableFieldDereference() {
+        String src = """
+    struct Foo { var bar: Int }
+    func test(arg: Foo?)->Int {
+        return arg.bar;
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void nullableArrayDereference() {
+        String src = """
+    func test(arg: [Int]?)->Int {
+        return arg[0];
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test
+    public void guardedNullableFieldStore() {
+        String src = """
+    struct Foo { var bar: Int }
+    func test(arg: Foo?) {
+        if (arg != null) {
+            arg.bar = 1;
+        }
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void nullableFieldStore() {
+        String src = """
+    struct Foo { var bar: Int }
+    func test(arg: Foo?) {
+        arg.bar = 1;
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void nullableArrayStore() {
+        String src = """
+    func test(arg: [Int]?) {
+        arg[0] = 1;
+    }
+""";
+        analyze(src, "test");
+    }
 }

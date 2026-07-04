@@ -22,9 +22,11 @@ public class NullableAnalysis {
 
     int reg = 0;
     ArrayList<LatticeElement> latticeElements = new ArrayList<>();
+    private final EZType returnType;
 
     public NullableAnalysis(Symbol.FunctionTypeSymbol functionSymbol, TypeDictionary typeDictionary) {
         AST.FuncDecl funcDecl = (AST.FuncDecl) functionSymbol.functionDecl;
+        returnType = ((EZType.EZTypeFunction) functionSymbol.type).returnType;
         setVirtualRegisters(funcDecl.scope);
     }
     private void setVirtualRegisters(Scope scope) {
@@ -32,9 +34,20 @@ public class NullableAnalysis {
             if (symbol instanceof Symbol.VarSymbol varSymbol) {
                 varSymbol.regNumber = reg++;
                 var type = varSymbol.type;
-                LatticeElement elem = type.isPrimitive()
-                        ? new LatticeElement(F_INT_TOP)
-                        : new LatticeElement(F_REF_TOP);
+                LatticeElement elem;
+                if (varSymbol instanceof Symbol.ParameterSymbol) {
+                    if (type.isPrimitive())
+                        elem = new LatticeElement(F_INT_BOTTOM);
+                    else if (type instanceof EZType.EZTypeNullable)
+                        elem = new LatticeElement(F_REF_BOTTOM);
+                    else
+                        elem = new LatticeElement(F_REF_NOT_NULL);
+                }
+                else {
+                    elem = type.isPrimitive()
+                            ? new LatticeElement(F_INT_TOP)
+                            : new LatticeElement(F_REF_TOP);
+                }
                 latticeElements.add(elem);
             }
         }
@@ -81,15 +94,9 @@ public class NullableAnalysis {
             this.intValue = value;
         }
         public LatticeElement(long value) {
+            kind = F_INT_TOP;
             setIntValue(value);
         }
-
-//        boolean nullable() {
-//            return kind == F_NULL || kind == F_NOT_NULL || kind == F_MAYBE_NULL;
-//        }
-//        boolean someInt() {
-//            return kind == F_INT || kind == F_ZERO || kind == F_NONZERO_CONST || kind == F_NONZERO_VARYING;
-//        }
         LatticeElement copy() {
             return new LatticeElement(kind,intValue);
         }
@@ -119,20 +126,6 @@ public class NullableAnalysis {
             }
             return (kind != prevKind);
         }
-//
-//        boolean setNull() {
-//            byte prevKind = kind;
-//            if (kind == F_UNKNOWN)
-//                kind = F_NULL;
-//            else if (kind == F_NOT_NULL)
-//                kind = F_MAYBE_NULL;
-//            else if (someInt()) {
-//                throw new CompilerException("Cannot assign null to lattice cell that is int type");
-//            }
-//            return (kind != prevKind);
-//        }
-
-
         boolean meet(LatticeElement other) {
             byte old = kind;
 
@@ -414,14 +407,13 @@ public class NullableAnalysis {
         }
 
         if (e instanceof AST.GetFieldExpr field) {
-            // First check object is non-null.
-            // Then use field type.
+            checkDereference(field.object, facts);
             return factFromType(field.type);
         }
 
         if (e instanceof AST.ArrayLoadExpr arrayLoad) {
-            // First check array is non-null.
-            // Then use element type.
+            checkDereference(arrayLoad.array, facts);
+            analyzeExpr(arrayLoad.expr, facts);
             return factFromType(arrayLoad.type);
         }
 
@@ -438,17 +430,19 @@ public class NullableAnalysis {
             LatticeElement v = analyzeExpr(un.expr, facts);
 
             if (un.op.str.equals("-")) {
+                if (v.isIntegerConstant())
+                    return new LatticeElement(-v.intValue);
                 if (v.isInteger())
-                    v.setIntValue(-v.intValue);
-                else
-                    throw new CompilerException("Cannot apply - to non integer");
+                    return new LatticeElement(F_INT_BOTTOM);
+                throw new CompilerException("Cannot apply - to non integer");
             }
 
             if (un.op.str.equals("!")) {
                 if (v.isTrue()) return new LatticeElement(0L);
                 if (v.isFalse()) return new LatticeElement(1L);
+                return new LatticeElement(F_INT_BOTTOM);
             }
-            return new LatticeElement(F_INT_BOTTOM);
+            return factFromType(un.type);
         }
 
         if (e instanceof AST.BinaryExpr bin) {
@@ -514,6 +508,7 @@ public class NullableAnalysis {
                 }
                 return result;
             }
+            return factFromType(bin.type);
         }
 
         return new LatticeElement(F_BOTTOM);
@@ -594,9 +589,24 @@ public class NullableAnalysis {
         }
 
         // non-null reference
-        if (lattice.isNull() || lattice.isMaybeNull()) {
+        if (!lattice.isReference() || lattice.isNull() || lattice.isMaybeNull()) {
             throw new CompilerException("Cannot assign null or potentially null value");
         }
+    }
+
+    private void checkDereference(AST.Expr receiver, Lattice facts) {
+        LatticeElement lattice = analyzeExpr(receiver, facts);
+        if (!lattice.isNotNull())
+            throw new CompilerException("Cannot dereference null or potentially null value", receiver.lineNumber);
+    }
+
+    private EZType.EZTypeStruct structType(EZType type) {
+        if (type instanceof EZType.EZTypeStruct structType)
+            return structType;
+        if (type instanceof EZType.EZTypeNullable nullable &&
+                nullable.baseType instanceof EZType.EZTypeStruct structType)
+            return structType;
+        throw new CompilerException("Expected struct type");
     }
 
     void transferStmt(AST.Stmt stmt, Lattice facts) {
@@ -618,7 +628,8 @@ public class NullableAnalysis {
 
         if (stmt instanceof AST.ExprStmt exprStmt &&
                 exprStmt.expr instanceof AST.SetFieldExpr setFieldExpr) {
-            EZType.EZTypeStruct structType = (EZType.EZTypeStruct) setFieldExpr.object.type;
+            checkDereference(setFieldExpr.object, facts);
+            EZType.EZTypeStruct structType = structType(setFieldExpr.object.type);
             EZType fieldType = structType.getField(setFieldExpr.fieldName);
             var lattice = analyzeExpr(setFieldExpr.value,facts);
             checkAssignment(fieldType,lattice);
@@ -627,6 +638,8 @@ public class NullableAnalysis {
 
         if (stmt instanceof AST.ExprStmt exprStmt &&
                 exprStmt.expr instanceof AST.ArrayStoreExpr arrayStoreExpr) {
+            checkDereference(arrayStoreExpr.array, facts);
+            analyzeExpr(arrayStoreExpr.expr, facts);
             EZType.EZTypeArray arrayType = null;
             EZType elementType = null;
             if (arrayStoreExpr.array.type instanceof EZType.EZTypeArray ta) {
@@ -641,11 +654,18 @@ public class NullableAnalysis {
             elementType = arrayType.getElementType();
             var lattice = analyzeExpr(arrayStoreExpr.value,facts);
             checkAssignment(elementType,lattice);
+            return;
         }
 
         if (stmt instanceof AST.ExprStmt exprStmt &&
                 exprStmt.expr instanceof AST.CallExpr callExpr) {
             analyzeExpr(callExpr,facts);
+            return;
+        }
+
+        if (stmt instanceof AST.ReturnStmt returnStmt && returnStmt.expr != null) {
+            LatticeElement lattice = analyzeExpr(returnStmt.expr, facts);
+            checkAssignment(returnType, lattice);
         }
     }
 
