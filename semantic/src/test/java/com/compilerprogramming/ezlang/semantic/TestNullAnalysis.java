@@ -20,13 +20,7 @@ public class TestNullAnalysis {
         sema2.analyze(program);
         var symbol = typeDict.lookup(symbolName);
         Assert.assertNotNull(symbol);
-        if (symbol instanceof Symbol.FunctionTypeSymbol ftsym) {
-            var fnDecl = (AST.FuncDecl) ftsym.functionDecl;
-            var flowGraph = FlowCFG.build(fnDecl);
-            var dot = flowGraph.toDot();
-            System.out.println(dot);
-            new NullableAnalysis(ftsym,typeDict).doAnalysis(flowGraph);
-        }
+        NullableAnalysis.analyze(typeDict);
     }
 
     @Test(expected = CompilerException.class)
@@ -234,6 +228,64 @@ public class TestNullAnalysis {
     func test(arg: [Int]?) {
         arg[0] = 1;
     }
+""";
+        analyze(src, "test");
+    }
+
+    @Test
+    public void testArrayInit() {
+        String src = """
+        func test()->[Int] {
+            return new [Int] { 1, 2, 3 };
+        }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void nullableArrayFillValue() {
+        String src = """
+        struct Foo {}
+        func test(arg: Foo?)->[Foo] {
+            return new [Foo] { len=1, value=arg };
+        }
+""";
+        analyze(src, "test");
+    }
+
+    @Test
+    public void knownNonNullArrayElement() {
+        String src = """
+        struct Foo { var value: Int }
+        func test()->Int {
+            var array = new [Foo?] { new Foo { value=1 }, null };
+            return array[0].value;
+        }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void knownNullArrayElement() {
+        String src = """
+        struct Foo { var value: Int }
+        func test()->Int {
+            var array = new [Foo?] { new Foo { value=1 }, null };
+            return array[1].value;
+        }
+""";
+        analyze(src, "test");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void arrayStoreInvalidatesKnownElement() {
+        String src = """
+        struct Foo { var value: Int }
+        func test()->Int {
+            var array = new [Foo?] { new Foo { value=1 } };
+            array[0] = null;
+            return array[0].value;
+        }
 """;
         analyze(src, "test");
     }

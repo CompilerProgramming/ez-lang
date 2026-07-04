@@ -2,6 +2,7 @@ package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.semantic.NullableAnalysis;
 import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
 import com.compilerprogramming.ezlang.semantic.SemaDefineTypes;
 import com.compilerprogramming.ezlang.types.Symbol;
@@ -35,6 +36,7 @@ public class Compiler {
         sema.analyze(program);
         var sema2 = new SemaAssignTypes(typeDict);
         sema2.analyze(program);
+        NullableAnalysis.analyze(typeDict);
         compile(typeDict, options);
         return typeDict;
     }
