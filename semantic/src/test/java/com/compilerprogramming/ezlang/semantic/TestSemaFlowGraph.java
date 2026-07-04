@@ -10,7 +10,7 @@ import org.junit.Test;
 
 public class TestSemaFlowGraph {
 
-    private String test(String src, String symbolName) {
+    private FlowCFG.FlowGraph test(String src, String symbolName) {
         Parser parser = new Parser();
         var program = parser.parse(new Lexer(src));
         var typeDict = new TypeDictionary();
@@ -25,7 +25,7 @@ public class TestSemaFlowGraph {
             var flowGraph = FlowCFG.build(fnDecl);
             var dot = flowGraph.toDot();
             System.out.println(dot);
-            return flowGraph.toString();
+            return flowGraph;
         }
         return null;
     }
@@ -113,4 +113,75 @@ public class TestSemaFlowGraph {
         System.out.println(result);
     }
 
+    @Test
+    public void test6() {
+        String src = """
+    func bar(i: Int)->Int { return 0; }
+    func foo(a: Int, b: Int)
+    {
+        while (a && b) {
+            bar(a+b + (bar(a) || bar(b)));
+            b = a;
+            a = 0;
+        }
+    }
+""";
+        var result = test(src, "foo");
+        var text = result.toString();
+        var dot = result.toDot();
+        Assert.assertTrue(text.contains("<short-circuit>"));
+        Assert.assertTrue(dot.contains("<short-circuit>"));
+        Assert.assertFalse(text.contains("(bar(a)||bar(b))"));
+        Assert.assertFalse(dot.contains("(bar(a)||bar(b))"));
+        System.out.println(result);
+    }
+
+
+    @Test
+    public void testLogicalOperatorsNestedInConditionExpressions() {
+        String src = """
+    func bar(i: Int) {}
+    func foo(a: Int, b: Int, c: Int, d: Int)
+    {
+        if ((a && b) == (c || d))
+            bar(1);
+    }
+""";
+        var graph = test(src, "foo");
+
+        var conditions = graph.blocks.stream()
+                .map(block -> block.condition)
+                .filter(java.util.Objects::nonNull)
+                .map(Object::toString)
+                .toList();
+
+        Assert.assertEquals(5, conditions.size());
+        Assert.assertTrue(conditions.contains("((a&&b)==(c||d))"));
+        Assert.assertTrue(conditions.containsAll(
+                java.util.List.of("a", "b", "c", "d")));
+    }
+
+    @Test
+    public void testLogicalOperatorsNestedInStatementExpressions() {
+        String src = """
+    func bar(i: Int)->Int { return i; }
+    func foo(a: Int, b: Int)->Int
+    {
+        var value = bar(a && b);
+        value = a || b;
+        return value + (a && b);
+    }
+""";
+        var graph = test(src, "foo");
+
+        long conditionCount = graph.blocks.stream()
+                .filter(block -> block.condition != null)
+                .count();
+        Assert.assertEquals(6, conditionCount);
+
+        long statementCount = graph.blocks.stream()
+                .flatMap(block -> block.statements.stream())
+                .count();
+        Assert.assertEquals(3, statementCount);
+    }
 }

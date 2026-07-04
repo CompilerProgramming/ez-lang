@@ -1,6 +1,7 @@
 package com.compilerprogramming.ezlang.semantic;
 
 import com.compilerprogramming.ezlang.parser.AST;
+import com.compilerprogramming.ezlang.parser.ASTVisitor;
 
 import java.util.*;
 
@@ -30,7 +31,7 @@ public final class FlowCFG {
         @Override
         public String toString() {
             if (condition != null) {
-                return "B" + from.id + " -" + kind + "(" + condition + ")-> B" + to.id;
+                return "B" + from.id + " -" + kind + "(" + FlowGraph.render(condition) + ")-> B" + to.id;
             }
             return "B" + from.id + " -" + kind + "-> B" + to.id;
         }
@@ -100,11 +101,11 @@ public final class FlowCFG {
                 }
 
                 for (AST.Stmt s : b.statements) {
-                    sb.append("  " + oneLine(s)).append('\n');
+                    sb.append("  " + render(s)).append('\n');
                 }
 
                 if (b.condition != null) {
-                    sb.append("  condition: " + oneLine(b.condition)).append('\n');
+                    sb.append("  condition: " + render(b.condition)).append('\n');
                 }
 
                 for (FlowEdge e : b.succs) {
@@ -126,11 +127,11 @@ public final class FlowCFG {
                 if (b == exit) sb.append("\\n<exit>");
 
                 for (AST.Stmt s : b.statements) {
-                    sb.append("\\n").append(escape(oneLine(s)));
+                    sb.append("\\n").append(escape(render(s)));
                 }
 
                 if (b.condition != null) {
-                    sb.append("\\n? ").append(escape(oneLine(b.condition)));
+                    sb.append("\\n? ").append(escape(render(b.condition)));
                 }
 
                 sb.append("\"];\n");
@@ -154,6 +155,39 @@ public final class FlowCFG {
         private static String oneLine(AST ast) {
             if (ast == null) return "";
             return ast.toString().replace("\n", " ").trim();
+        }
+
+        /*
+         * Logical descendants have their own CFG blocks. Avoid recursively
+         * printing them again as part of the enclosing AST node.
+         */
+        private static String render(AST ast) {
+            String result = oneLine(ast);
+            List<String> shortCircuitExpressions = new ArrayList<>();
+            ast.accept(new ASTVisitor() {
+                @Override
+                public ASTVisitor enter(AST.BinaryExpr expr) {
+                    if (expr.op.str.equals("&&") || expr.op.str.equals("||")) {
+                        shortCircuitExpressions.add(oneLine(expr));
+                        return null;
+                    }
+                    return this;
+                }
+
+                @Override
+                public ASTVisitor enter(AST.UnaryExpr expr) {
+                    if (expr.op.str.equals("!")) {
+                        shortCircuitExpressions.add(oneLine(expr));
+                        return null;
+                    }
+                    return this;
+                }
+            });
+
+            for (String expression : shortCircuitExpressions) {
+                result = result.replace(expression, "<short-circuit>");
+            }
+            return result;
         }
 
         private static String escape(String s) {
@@ -225,6 +259,9 @@ public final class FlowCFG {
         }
 
         if (stmt instanceof AST.ReturnStmt ret) {
+            if (ret.expr != null) {
+                cur = buildExpr(ret.expr, cur);
+            }
             cur.statements.add(ret);
             addEdge(cur, graph.exit, EdgeKind.NORMAL, null);
             return newBlock();
@@ -242,10 +279,15 @@ public final class FlowCFG {
             return newBlock();
         }
 
-        /*
-         * Ordinary non-branching statements are accumulated into the current block:
-         * AssignStmt, VarStmt, ExprStmt, VarDeclStmt, etc.
-         */
+        if (stmt instanceof AST.AssignStmt assign) {
+            cur = buildExpr(assign.rhs, cur);
+        } else if (stmt instanceof AST.VarStmt var) {
+            cur = buildExpr(var.expr, cur);
+        } else if (stmt instanceof AST.ExprStmt exprStmt) {
+            cur = buildExpr(exprStmt.expr, cur);
+        }
+
+        // Store the statement after the blocks needed to evaluate its expression.
         cur.statements.add(stmt);
         return cur;
     }
@@ -257,6 +299,21 @@ public final class FlowCFG {
         return cur;
     }
 
+    /**
+     * Builds an if/else diamond and returns its join block.
+     * {@link #buildCondition} may insert additional blocks between {@code cur}
+     * and the two branch-entry blocks when the condition short-circuits.
+     * A branch that terminates (for example with return) has no edge to the join.
+     *
+     * <pre>
+     *                  +--TRUE--> thenBlock -> thenExit --NORMAL--+
+     * cur -> condition                                           +--> afterIf
+     *                  +--FALSE-> elseBlock -> elseExit --NORMAL--+
+     * </pre>
+     *
+     * When there is no else statement, {@code elseBlock} is an empty block
+     * connected directly to {@code afterIf}.
+     */
     private FlowBlock buildIf(AST.IfElseStmt ifs, FlowBlock cur) {
         FlowBlock thenBlock = newBlock();
         FlowBlock elseBlock = newBlock();
@@ -281,6 +338,24 @@ public final class FlowCFG {
         return afterIf;
     }
 
+    /**
+     * Builds a loop with a dedicated condition entry and returns the block
+     * reached when the condition is false or a break is executed.
+     * {@link #buildCondition} may expand {@code condBlock} into several blocks.
+     *
+     * <pre>
+     *                                      +--------------------+
+     *                                      |                    |
+     * cur --NORMAL--> condBlock --TRUE--> bodyBlock -> bodyExit-+
+     *                       |
+     *                       +--FALSE--> afterLoop
+     *
+     * continue ---------------------> condBlock
+     * break    ---------------------> afterLoop
+     * </pre>
+     *
+     * The loop-back edge is omitted when the body terminates.
+     */
     private FlowBlock buildWhile(AST.WhileStmt wh, FlowBlock cur) {
         FlowBlock condBlock = newBlock();
         FlowBlock bodyBlock = newBlock();
@@ -302,12 +377,30 @@ public final class FlowCFG {
         return afterLoop;
     }
 
-    private void buildCondition(
-            AST.Expr expr,
-            FlowBlock from,
-            FlowBlock trueTarget,
-            FlowBlock falseTarget
-    ) {
+    /**
+     * Routes evaluation of {@code expr} to caller-supplied true and false
+     * targets. Logical operators are expanded recursively to preserve
+     * short-circuit evaluation:
+     *
+     * <pre>
+     * lhs &amp;&amp; rhs:
+     *   from --lhs TRUE--> rhsBlock --rhs TRUE--> trueTarget
+     *     |                   +------rhs FALSE--> falseTarget
+     *     +------lhs FALSE----------------------> falseTarget
+     *
+     * lhs || rhs:
+     *   from --lhs TRUE-------------------------> trueTarget
+     *     +------lhs FALSE--> rhsBlock --rhs TRUE-> trueTarget
+     *                           +------rhs FALSE-> falseTarget
+     *
+     * !value: build value with trueTarget and falseTarget exchanged
+     * </pre>
+     *
+     * For a non-logical root, expression children are evaluated first so any
+     * nested logical expressions get their own blocks. The resulting block is
+     * then marked with {@code expr} and receives TRUE and FALSE outgoing edges.
+     */
+    private void buildCondition(AST.Expr expr,FlowBlock from,FlowBlock trueTarget,FlowBlock falseTarget) {
         if (expr instanceof AST.BinaryExpr bin) {
             String op = bin.op.str;
 
@@ -333,8 +426,97 @@ public final class FlowCFG {
             return;
         }
 
-        from.condition = expr;
-        addEdge(from, trueTarget, EdgeKind.TRUE, expr);
-        addEdge(from, falseTarget, EdgeKind.FALSE, expr);
+        FlowBlock conditionBlock = buildExprChildren(expr, from);
+        conditionBlock.condition = expr;
+        addEdge(conditionBlock, trueTarget, EdgeKind.TRUE, expr);
+        addEdge(conditionBlock, falseTarget, EdgeKind.FALSE, expr);
+    }
+
+    /**
+     * Builds the control flow needed to evaluate an expression used as a value.
+     * A logical expression has two short-circuit paths which rejoin once its
+     * boolean value has been determined.
+     */
+    private FlowBlock buildExpr(AST.Expr expr, FlowBlock from) {
+        if (isLogical(expr)) {
+            FlowBlock trueBlock = newBlock();
+            FlowBlock falseBlock = newBlock();
+            FlowBlock afterExpr = newBlock();
+
+            buildCondition(expr, from, trueBlock, falseBlock);
+            addEdge(trueBlock, afterExpr, EdgeKind.NORMAL, null);
+            addEdge(falseBlock, afterExpr, EdgeKind.NORMAL, null);
+            return afterExpr;
+        }
+
+        return buildExprChildren(expr, from);
+    }
+
+    /**
+     * Recurses through immediate expression children in evaluation order.
+     */
+    private FlowBlock buildExprChildren(AST.Expr expr, FlowBlock cur) {
+        if (expr instanceof AST.BinaryExpr binary) {
+            cur = buildExpr(binary.expr1, cur);
+            return buildExpr(binary.expr2, cur);
+        }
+
+        if (expr instanceof AST.UnaryExpr unary) {
+            return buildExpr(unary.expr, cur);
+        }
+
+        if (expr instanceof AST.ArrayStoreExpr store) {
+            cur = buildExpr(store.array, cur);
+            cur = buildExpr(store.expr, cur);
+            return buildExpr(store.value, cur);
+        }
+
+        if (expr instanceof AST.ArrayLoadExpr load) {
+            cur = buildExpr(load.array, cur);
+            return buildExpr(load.expr, cur);
+        }
+
+        if (expr instanceof AST.SetFieldExpr set) {
+            cur = buildExpr(set.object, cur);
+            return buildExpr(set.value, cur);
+        }
+
+        if (expr instanceof AST.GetFieldExpr get) {
+            return buildExpr(get.object, cur);
+        }
+
+        if (expr instanceof AST.CallExpr call) {
+            cur = buildExpr(call.callee, cur);
+            for (AST.Expr arg : call.args) {
+                cur = buildExpr(arg, cur);
+            }
+            return cur;
+        }
+
+        if (expr instanceof AST.NewExpr newExpr) {
+            if (newExpr.len != null) {
+                cur = buildExpr(newExpr.len, cur);
+            }
+            if (newExpr.initValue != null) {
+                cur = buildExpr(newExpr.initValue, cur);
+            }
+            return cur;
+        }
+
+        if (expr instanceof AST.InitExpr init) {
+            cur = buildExpr(init.newExpr, cur);
+            for (AST.Expr initializer : init.initExprList) {
+                cur = buildExpr(initializer, cur);
+            }
+        }
+
+        return cur;
+    }
+
+    private boolean isLogical(AST.Expr expr) {
+        if (expr instanceof AST.BinaryExpr binary) {
+            return binary.op.str.equals("&&") || binary.op.str.equals("||");
+        }
+        return expr instanceof AST.UnaryExpr unary && unary.op.str.equals("!");
     }
 }

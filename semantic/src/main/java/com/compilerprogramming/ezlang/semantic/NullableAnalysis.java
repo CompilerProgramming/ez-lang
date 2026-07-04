@@ -213,29 +213,29 @@ public class NullableAnalysis {
             return Objects.hash(kind, intValue);
         }
     }
-    static final class Facts {
+    static final class Lattice {
         final LatticeElement[] vars;
 
-        Facts(List<LatticeElement> elementList) {
+        Lattice(List<LatticeElement> elementList) {
             vars = elementList.toArray(new LatticeElement[0]);
         }
-        Facts(LatticeElement[] elements) {
+        Lattice(LatticeElement[] elements) {
             vars = elements;
         }
 
-        Facts copy() {
+        Lattice copy() {
             LatticeElement[] copyvars = new LatticeElement[vars.length];
             for (int i = 0; i < copyvars.length; i++)
                 copyvars[i] = vars[i].copy();
-            return new Facts(copyvars);
+            return new Lattice(copyvars);
         }
 
         LatticeElement get(int reg) {
             return vars[reg];
         }
 
-        static Facts merge(Facts a, Facts b) {
-            Facts out = a.copy();
+        static Lattice merge(Lattice a, Lattice b) {
+            Lattice out = a.copy();
 
             for (int i = 0; i < out.vars.length; i++) {
                 out.vars[i].meet(b.vars[i]);
@@ -247,13 +247,33 @@ public class NullableAnalysis {
         @Override
         public boolean equals(Object o) {
             if (o == null || getClass() != o.getClass()) return false;
-            Facts facts = (Facts) o;
-            return Objects.deepEquals(vars, facts.vars);
+            Lattice lattice = (Lattice) o;
+            return Objects.deepEquals(vars, lattice.vars);
         }
     }
 
-    LatticeElement analyzeExpr(AST.Expr e, Facts facts) {
-        if (e instanceof AST.NewExpr || e instanceof AST.InitExpr) {
+    LatticeElement analyzeExpr(AST.Expr e, Lattice facts) {
+        if (e instanceof AST.NewExpr) {
+            return new LatticeElement(F_NOT_NULL);
+        }
+
+        if (e instanceof AST.InitExpr initExpr) {
+            if (initExpr.newExpr.type instanceof EZType.EZTypeStruct typeStruct) {
+                for (AST.Expr expr: initExpr.initExprList) {
+                    if (expr instanceof AST.SetFieldExpr setFieldExpr) {
+                        var fieldType = typeStruct.getField(setFieldExpr.fieldName);
+                        var latticeElement = analyzeExpr(setFieldExpr.value,facts);
+                        checkAssignment(fieldType,latticeElement);
+                    }
+                }
+            }
+            else if (initExpr.newExpr.type instanceof EZType.EZTypeArray arrayType) {
+                var elemType = arrayType.getElementType();
+                for (AST.Expr expr: initExpr.initExprList) {
+                    var latticeElement = analyzeExpr(expr,facts);
+                    checkAssignment(elemType,latticeElement);
+                }
+            }
             return new LatticeElement(F_NOT_NULL);
         }
 
@@ -398,29 +418,29 @@ public class NullableAnalysis {
     public void doAnalysis(FlowCFG.FlowGraph cfg) {
         Queue<FlowCFG.FlowBlock> worklist = new ArrayDeque<>();
 
-        Map<FlowCFG.FlowBlock, Facts> in = new HashMap<>();
-        Map<FlowCFG.FlowBlock, Facts> out = new HashMap<>();
+        Map<FlowCFG.FlowBlock, Lattice> in = new HashMap<>();
+        Map<FlowCFG.FlowBlock, Lattice> out = new HashMap<>();
 
-        var initialFacts = new Facts(latticeElements);
+        var initialFacts = new Lattice(latticeElements);
         in.put(cfg.entry, initialFacts);
         worklist.add(cfg.entry);
 
         while (!worklist.isEmpty()) {
             FlowCFG.FlowBlock b = worklist.remove();
 
-            Facts inFacts = in.get(b);
-            if (inFacts == null)
+            Lattice inLattice = in.get(b);
+            if (inLattice == null)
                 throw new CompilerException("Missing facts");
-            Facts outFacts = transferBlock(b, inFacts);
+            Lattice outLattice = transferBlock(b, inLattice);
 
-            if (!outFacts.equals(out.get(b))) {
-                out.put(b, outFacts);
+            if (!outLattice.equals(out.get(b))) {
+                out.put(b, outLattice);
 
                 for (FlowCFG.FlowEdge e : b.succs) {
-                    Facts edgeFacts = applyEdgeFacts(outFacts, e);
+                    Lattice edgeLattice = applyEdgeFacts(outLattice, e);
 
-                    Facts oldIn = in.get(e.to);
-                    Facts newIn = oldIn == null ? edgeFacts : Facts.merge(oldIn, edgeFacts);
+                    Lattice oldIn = in.get(e.to);
+                    Lattice newIn = oldIn == null ? edgeLattice : Lattice.merge(oldIn, edgeLattice);
 
                     if (!newIn.equals(oldIn)) {
                         in.put(e.to, newIn);
@@ -431,14 +451,14 @@ public class NullableAnalysis {
         }
     }
 
-    Facts transferBlock(FlowCFG.FlowBlock block, Facts in) {
-        Facts facts = in.copy();
+    Lattice transferBlock(FlowCFG.FlowBlock block, Lattice in) {
+        Lattice lattice = in.copy();
 
         for (AST.Stmt stmt : block.statements) {
-            transferStmt(stmt, facts);
+            transferStmt(stmt, lattice);
         }
 
-        return facts;
+        return lattice;
     }
 
     private void checkAssignment(EZType type, LatticeElement lattice) {
@@ -458,7 +478,7 @@ public class NullableAnalysis {
         }
     }
 
-    void transferStmt(AST.Stmt stmt, Facts facts) {
+    void transferStmt(AST.Stmt stmt, Lattice facts) {
         if (stmt instanceof AST.AssignStmt assign) {
             Symbol.VarSymbol sym = (Symbol.VarSymbol) assign.nameExpr.symbol;
             var lattice = analyzeExpr(assign.rhs, facts);
@@ -508,9 +528,8 @@ public class NullableAnalysis {
         }
     }
 
-
-    Facts applyEdgeFacts(Facts in, FlowCFG.FlowEdge edge) {
-        Facts out = in.copy();
+    Lattice applyEdgeFacts(Lattice in, FlowCFG.FlowEdge edge) {
+        Lattice out = in.copy();
 
         if (edge.kind == FlowCFG.EdgeKind.TRUE) {
             applyConditionFacts(out, edge.condition, true);
@@ -520,7 +539,7 @@ public class NullableAnalysis {
 
         return out;
     }
-    void applyConditionFacts(Facts facts, AST.Expr expr, boolean branchIsTrue) {
+    void applyConditionFacts(Lattice facts, AST.Expr expr, boolean branchIsTrue) {
         if (!(expr instanceof AST.BinaryExpr bin)) {
             return;
         }
