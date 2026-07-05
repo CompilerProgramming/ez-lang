@@ -437,4 +437,47 @@ public class TestSemaAssignTypes {
 """;
         analyze(src, "foo", "func foo()->Int");
     }
+
+    // Nullable Bug call should fail
+    @Test
+    public void test24() {
+        String src = """
+    struct Foo { var bar: Int }
+    func bar(arg: Foo) {
+    }
+    func foo(arg: Foo?) {
+        bar(arg);
+    }
+""";
+        analyze(src, "foo", "func foo(arg: Foo?)");
+    }
+
+    // Nullable Bug call should fail
+    @Test
+    public void test25() {
+        String src = """
+    struct Foo { var bar: Int }
+    func bar(arg: Foo) {
+    }
+    func foo() {
+        bar(null);
+    }
+""";
+        analyze(src, "foo", "func foo()");
+    }
+
+    // Nullable Bug assignment should fail
+    @Test
+    public void test26() {
+        String src = """
+    struct Foo { var bar: Int }
+    func bar()->Foo? {
+    }
+    func foo() {
+        var f: Foo
+        f = bar();
+    }
+""";
+        analyze(src, "foo", "func foo()");
+    }
 }

@@ -9,6 +9,7 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.AST;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.semantic.NullableAnalysis;
 import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
 import com.compilerprogramming.ezlang.semantic.SemaDefineTypes;
 import com.compilerprogramming.ezlang.types.Scope;
@@ -86,6 +87,7 @@ public class Compiler {
         sema.analyze(program);
         var sema2 = new SemaAssignTypes(typeDict);
         sema2.analyze(program);
+        NullableAnalysis.analyze(typeDict);
         return typeDict;
     }
 

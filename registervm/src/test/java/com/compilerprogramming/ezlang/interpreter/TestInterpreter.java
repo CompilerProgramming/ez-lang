@@ -163,10 +163,11 @@ public class TestInterpreter {
                 {
                     var i: Int
                 }
-                func foo()->Int 
+                func foo()->Int
                 {
                     var f = new [Foo?] { new Foo{i = 1}, null }
-                    return null == f[1] && 1 == f[0].i
+                    var f0 = f[0]
+                    return null == f[1] && f0 != null && 1 == f0.i
                 }
 
                 """;

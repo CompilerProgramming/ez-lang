@@ -4578,7 +4578,8 @@ L3:
                 func foo()->Int
                 {
                     var f = new [Foo?] { new Foo{i = 1}, null }
-                    return null == f[1] && 1 == f[0].i
+                    var f0 = f[0]
+                    return null == f[1] && f0 != null && 1 == f0.i
                 }
 """;
         String result = compileSrc(src);
@@ -4587,136 +4588,196 @@ func foo
 Before SSA
 ==========
 L0:
-    %t1 = New([Foo?], len=2)
-    %t2 = New(Foo)
-    %t2.i = 1
-    %t1[0] = %t2
-    %t1[1] = null
-    f = %t1
-    %t3 = f[1]
-    %t4 = null==%t3
-    if %t4 goto L2 else goto L3
+    %t2 = New([Foo?], len=2)
+    %t3 = New(Foo)
+    %t3.i = 1
+    %t2[0] = %t3
+    %t2[1] = null
+    f = %t2
+    %t4 = f[0]
+    f0 = %t4
+    %t5 = f[1]
+    %t6 = null==%t5
+    if %t6 goto L5 else goto L6
+L5:
+    %t7 = f0!=null
+    goto  L7
+L7:
+    if %t7 goto L2 else goto L3
 L2:
-    %t5 = f[0]
-    %t6 = %t5.i
-    %t7 = 1==%t6
+    %t8 = f0.i
+    %t9 = 1==%t8
     goto  L4
 L4:
-    ret %t7
+    ret %t9
     goto  L1
 L1:
 L3:
-    %t7 = 0
+    %t9 = 0
     goto  L4
+L6:
+    %t7 = 0
+    goto  L7
 After SSA
 =========
 L0:
-    %t1_0 = New([Foo?], len=2)
-    %t2_0 = New(Foo)
-    %t2_0.i = 1
-    %t1_0[0] = %t2_0
-    %t1_0[1] = null
-    f_0 = %t1_0
-    %t3_0 = f_0[1]
-    %t4_0 = null==%t3_0
-    if %t4_0 goto L2 else goto L3
+    %t2_0 = New([Foo?], len=2)
+    %t3_0 = New(Foo)
+    %t3_0.i = 1
+    %t2_0[0] = %t3_0
+    %t2_0[1] = null
+    f_0 = %t2_0
+    %t4_0 = f_0[0]
+    f0_0 = %t4_0
+    %t5_0 = f_0[1]
+    %t6_0 = null==%t5_0
+    if %t6_0 goto L5 else goto L6
+L5:
+    %t7_1 = f0_0!=null
+    goto  L7
+L7:
+    %t7_2 = phi(%t7_1, %t7_0)
+    if %t7_2 goto L2 else goto L3
 L2:
-    %t5_0 = f_0[0]
-    %t6_0 = %t5_0.i
-    %t7_1 = 1==%t6_0
+    %t8_0 = f0_0.i
+    %t9_1 = 1==%t8_0
     goto  L4
 L4:
-    %t7_2 = phi(%t7_1, %t7_0)
-    ret %t7_2
+    %t9_2 = phi(%t9_1, %t9_0)
+    ret %t9_2
     goto  L1
 L1:
 L3:
-    %t7_0 = 0
+    %t9_0 = 0
     goto  L4
+L6:
+    %t7_0 = 0
+    goto  L7
 After converting from SSA to CSSA
 L0:
-    %t1_0 = New([Foo?], len=2)
-    %t2_0 = New(Foo)
-    %t2_0.i = 1
-    %t1_0[0] = %t2_0
-    %t1_0[1] = null
-    f_0 = %t1_0
-    %t3_0 = f_0[1]
-    %t4_0 = null==%t3_0
-    if %t4_0 goto L2 else goto L3
+    %t2_0 = New([Foo?], len=2)
+    %t3_0 = New(Foo)
+    %t3_0.i = 1
+    %t2_0[0] = %t3_0
+    %t2_0[1] = null
+    f_0 = %t2_0
+    %t4_0 = f_0[0]
+    f0_0 = %t4_0
+    %t5_0 = f_0[1]
+    %t6_0 = null==%t5_0
+    if %t6_0 goto L5 else goto L6
+L5:
+    %t7_1 = f0_0!=null
+    (%t7_1_27) = (%t7_1)
+    goto  L7
+L7:
+    %t7_2_29 = phi(%t7_1_27, %t7_0_28)
+    (%t7_2) = (%t7_2_29)
+    if %t7_2 goto L2 else goto L3
 L2:
-    %t5_0 = f_0[0]
-    %t6_0 = %t5_0.i
-    %t7_1 = 1==%t6_0
-    (%t7_1_18) = (%t7_1)
+    %t8_0 = f0_0.i
+    %t9_1 = 1==%t8_0
+    (%t9_1_24) = (%t9_1)
     goto  L4
 L4:
-    %t7_2_20 = phi(%t7_1_18, %t7_0_19)
-    (%t7_2) = (%t7_2_20)
-    ret %t7_2
+    %t9_2_26 = phi(%t9_1_24, %t9_0_25)
+    (%t9_2) = (%t9_2_26)
+    ret %t9_2
     goto  L1
 L1:
 L3:
-    %t7_0 = 0
-    (%t7_0_19) = (%t7_0)
+    %t9_0 = 0
+    (%t9_0_25) = (%t9_0)
     goto  L4
+L6:
+    %t7_0 = 0
+    (%t7_0_28) = (%t7_0)
+    goto  L7
 After removing phis from CSSA
 L0:
-    %t1_0 = New([Foo?], len=2)
-    %t2_0 = New(Foo)
-    %t2_0.i = 1
-    %t1_0[0] = %t2_0
-    %t1_0[1] = null
-    f_0 = %t1_0
-    %t3_0 = f_0[1]
-    %t4_0 = null==%t3_0
-    if %t4_0 goto L2 else goto L3
+    %t2_0 = New([Foo?], len=2)
+    %t3_0 = New(Foo)
+    %t3_0.i = 1
+    %t2_0[0] = %t3_0
+    %t2_0[1] = null
+    f_0 = %t2_0
+    %t4_0 = f_0[0]
+    f0_0 = %t4_0
+    %t5_0 = f_0[1]
+    %t6_0 = null==%t5_0
+    if %t6_0 goto L5 else goto L6
+L5:
+    %t7_1 = f0_0!=null
+    (%t7_1_27) = (%t7_1)
+    %t7_2_29 = %t7_1_27
+    goto  L7
+L7:
+    (%t7_2) = (%t7_2_29)
+    if %t7_2 goto L2 else goto L3
 L2:
-    %t5_0 = f_0[0]
-    %t6_0 = %t5_0.i
-    %t7_1 = 1==%t6_0
-    (%t7_1_18) = (%t7_1)
-    %t7_2_20 = %t7_1_18
+    %t8_0 = f0_0.i
+    %t9_1 = 1==%t8_0
+    (%t9_1_24) = (%t9_1)
+    %t9_2_26 = %t9_1_24
     goto  L4
 L4:
-    (%t7_2) = (%t7_2_20)
-    ret %t7_2
+    (%t9_2) = (%t9_2_26)
+    ret %t9_2
     goto  L1
 L1:
 L3:
-    %t7_0 = 0
-    (%t7_0_19) = (%t7_0)
-    %t7_2_20 = %t7_0_19
+    %t9_0 = 0
+    (%t9_0_25) = (%t9_0)
+    %t9_2_26 = %t9_0_25
     goto  L4
+L6:
+    %t7_0 = 0
+    (%t7_0_28) = (%t7_0)
+    %t7_2_29 = %t7_0_28
+    goto  L7
 After exiting SSA
 =================
 L0:
-    %t1_0 = New([Foo?], len=2)
-    %t2_0 = New(Foo)
-    %t2_0.i = 1
-    %t1_0[0] = %t2_0
-    %t1_0[1] = null
-    f_0 = %t1_0
-    %t3_0 = f_0[1]
-    %t4_0 = null==%t3_0
-    if %t4_0 goto L2 else goto L3
+    %t2_0 = New([Foo?], len=2)
+    %t3_0 = New(Foo)
+    %t3_0.i = 1
+    %t2_0[0] = %t3_0
+    %t2_0[1] = null
+    f_0 = %t2_0
+    %t4_0 = f_0[0]
+    f0_0 = %t4_0
+    %t5_0 = f_0[1]
+    %t6_0 = null==%t5_0
+    if %t6_0 goto L5 else goto L6
+L5:
+    %t7_1 = f0_0!=null
+    %t7_1_27 = %t7_1
+    %t7_2_29 = %t7_1_27
+    goto  L7
+L7:
+    %t7_2 = %t7_2_29
+    if %t7_2 goto L2 else goto L3
 L2:
-    %t5_0 = f_0[0]
-    %t6_0 = %t5_0.i
-    %t7_1 = 1==%t6_0
-    %t7_1_18 = %t7_1
-    %t7_2_20 = %t7_1_18
+    %t8_0 = f0_0.i
+    %t9_1 = 1==%t8_0
+    %t9_1_24 = %t9_1
+    %t9_2_26 = %t9_1_24
     goto  L4
 L4:
-    %t7_2 = %t7_2_20
-    ret %t7_2
+    %t9_2 = %t9_2_26
+    ret %t9_2
     goto  L1
 L1:
 L3:
-    %t7_0 = 0
-    %t7_0_19 = %t7_0
-    %t7_2_20 = %t7_0_19
+    %t9_0 = 0
+    %t9_0_25 = %t9_0
+    %t9_2_26 = %t9_0_25
     goto  L4
+L6:
+    %t7_0 = 0
+    %t7_0_28 = %t7_0
+    %t7_2_29 = %t7_0_28
+    goto  L7
 """, result);
     }
 
