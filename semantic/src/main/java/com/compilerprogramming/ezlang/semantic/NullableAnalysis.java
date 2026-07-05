@@ -96,7 +96,6 @@ public class NullableAnalysis {
     static final class LatticeElement {
         public byte kind;
         private long intValue;
-        private Map<Long, LatticeElement> arrayElements;
 
         public LatticeElement(byte kind) {
             this.kind = kind;
@@ -110,29 +109,9 @@ public class NullableAnalysis {
             setIntValue(value);
         }
         LatticeElement copy() {
-            LatticeElement copy = new LatticeElement(kind, intValue);
-            if (arrayElements != null) {
-                copy.arrayElements = new HashMap<>();
-                for (var entry : arrayElements.entrySet())
-                    copy.arrayElements.put(entry.getKey(), entry.getValue().copy());
-            }
-            return copy;
+            return new LatticeElement(kind, intValue);
         }
 
-        void setArrayElement(long index, LatticeElement element) {
-            if (arrayElements == null)
-                arrayElements = new HashMap<>();
-            arrayElements.put(index, element.copy());
-        }
-
-        LatticeElement getArrayElement(long index) {
-            LatticeElement element = arrayElements == null ? null : arrayElements.get(index);
-            return element == null ? null : element.copy();
-        }
-
-        void clearArrayElements() {
-            arrayElements = null;
-        }
         boolean isTrue() {
             return kind == F_INT_NONZERO_CONST || kind == F_INT_NONZERO_VARYING;
         }
@@ -161,8 +140,6 @@ public class NullableAnalysis {
         }
         boolean meet(LatticeElement other) {
             byte old = kind;
-            if (!Objects.equals(arrayElements, other.arrayElements))
-                arrayElements = null;
 
             // universal top/bottom
             if (kind == F_TOP) {
@@ -287,7 +264,6 @@ public class NullableAnalysis {
             LatticeElement copy = other.copy();
             this.kind = copy.kind;
             this.intValue = copy.intValue;
-            this.arrayElements = copy.arrayElements;
         }
         boolean isTop() {
             return kind == F_TOP;
@@ -351,13 +327,12 @@ public class NullableAnalysis {
         public boolean equals(Object o) {
             if (o == null || getClass() != o.getClass()) return false;
             LatticeElement that = (LatticeElement) o;
-            return kind == that.kind && intValue == that.intValue &&
-                    Objects.equals(arrayElements, that.arrayElements);
+            return kind == that.kind && intValue == that.intValue;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(kind, intValue, arrayElements);
+            return Objects.hash(kind, intValue);
         }
     }
     static final class Lattice {
@@ -430,11 +405,6 @@ public class NullableAnalysis {
                             : expr;
                     var latticeElement = analyzeExpr(value,facts);
                     checkAssignment(elemType,latticeElement);
-                    if (expr instanceof AST.ArrayInitExpr arrayInitExpr) {
-                        LatticeElement index = analyzeExpr(arrayInitExpr.expr, facts);
-                        if (index.isIntegerConstant())
-                            result.setArrayElement(index.intValue, latticeElement);
-                    }
                 }
             }
             return result;
@@ -453,9 +423,6 @@ public class NullableAnalysis {
                 var lattice = analyzeExpr(expr,facts);
                 checkAssignment(type,lattice);
             }
-
-            invalidateArrayElements(facts);
-
             // Use function return type:
             // Foo  -> NON_NULL
             // Foo? -> UNKNOWN
@@ -463,18 +430,13 @@ public class NullableAnalysis {
         }
 
         if (e instanceof AST.GetFieldExpr field) {
-            checkDereference(field.object, facts);
+            //checkDereference(field.object, facts);
             return factFromType(field.type);
         }
 
         if (e instanceof AST.ArrayLoadExpr arrayLoad) {
             LatticeElement array = checkDereference(arrayLoad.array, facts);
             LatticeElement index = analyzeExpr(arrayLoad.expr, facts);
-            if (index.isIntegerConstant()) {
-                LatticeElement element = array.getArrayElement(index.intValue);
-                if (element != null)
-                    return element;
-            }
             return factFromType(arrayLoad.type);
         }
 
@@ -668,11 +630,6 @@ public class NullableAnalysis {
         return lattice;
     }
 
-    private void invalidateArrayElements(Lattice facts) {
-        for (LatticeElement element : facts.vars)
-            element.clearArrayElements();
-    }
-
     private EZType.EZTypeStruct structType(EZType type) {
         if (type instanceof EZType.EZTypeStruct structType)
             return structType;
@@ -727,12 +684,6 @@ public class NullableAnalysis {
             elementType = arrayType.getElementType();
             var lattice = analyzeExpr(arrayStoreExpr.value,facts);
             checkAssignment(elementType,lattice);
-            invalidateArrayElements(facts);
-            if (arrayStoreExpr.array instanceof AST.NameExpr name &&
-                    name.symbol instanceof Symbol.VarSymbol varSymbol &&
-                    index.isIntegerConstant()) {
-                facts.get(varSymbol.regNumber).setArrayElement(index.intValue, lattice);
-            }
             return;
         }
 

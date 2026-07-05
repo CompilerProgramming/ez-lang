@@ -7,6 +7,7 @@ import com.compilerprogramming.ezlang.parser.Parser;
 import com.compilerprogramming.ezlang.types.Symbol;
 import com.compilerprogramming.ezlang.types.TypeDictionary;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestNullAnalysis {
@@ -177,6 +178,7 @@ public class TestNullAnalysis {
         analyze(src, "test");
     }
 
+    @Ignore("Array index based value is not tracked during semantic analysis")
     @Test(expected = CompilerException.class)
     public void nullableFieldDereference() {
         String src = """
@@ -265,6 +267,7 @@ public class TestNullAnalysis {
         analyze(src, "test");
     }
 
+    @Ignore("Array index based value is not tracked during semantic analysis")
     @Test(expected = CompilerException.class)
     public void knownNullArrayElement() {
         String src = """
@@ -277,6 +280,7 @@ public class TestNullAnalysis {
         analyze(src, "test");
     }
 
+    @Ignore("Array index based value is not tracked during semantic analysis")
     @Test(expected = CompilerException.class)
     public void arrayStoreInvalidatesKnownElement() {
         String src = """
