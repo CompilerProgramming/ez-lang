@@ -293,4 +293,23 @@ public class TestNullAnalysis {
 """;
         analyze(src, "test");
     }
+
+    @Test
+    public void testGuardedLogicalAnd()
+    {
+        String src = """
+                struct Foo
+                {
+                    var i: Int
+                }
+                func foo()->Int
+                {
+                    var f = new [Foo?] { new Foo{i = 1}, null }
+                    var f0 = f[0]
+                    return null == f[1] && f0 != null && 1 == f0.i
+                }
+
+                """;
+        analyze(src, "foo");
+    }
 }

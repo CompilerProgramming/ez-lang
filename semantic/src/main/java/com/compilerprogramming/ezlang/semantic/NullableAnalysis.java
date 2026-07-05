@@ -430,7 +430,7 @@ public class NullableAnalysis {
         }
 
         if (e instanceof AST.GetFieldExpr field) {
-            //checkDereference(field.object, facts);
+            checkDereference(field.object, facts);
             return factFromType(field.type);
         }
 
