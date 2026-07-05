@@ -375,6 +375,12 @@ public class NullableAnalysis {
     }
 
     LatticeElement analyzeExpr(AST.Expr e, Lattice facts) {
+        // FlowCFG lowers every &&, ||, and ! into condition blocks. Their
+        // operands are analyzed in those blocks; walking the original logical
+        // AST again here would replay guarded operands after the paths merge.
+        if (isLogical(e))
+            return factFromType(e.type);
+
         if (e instanceof AST.NewExpr newExpr) {
             if (newExpr.type instanceof EZType.EZTypeArray arrayType) {
                 if (newExpr.len != null)
@@ -600,6 +606,11 @@ public class NullableAnalysis {
         for (AST.Stmt stmt : block.statements) {
             transferStmt(stmt, lattice);
         }
+        // A condition is an evaluation point produced by logical-expression
+        // lowering. Analyze it on every block transfer so fixed-point revisits
+        // use the current incoming facts.
+        if (block.condition != null)
+            analyzeExpr(block.condition, lattice);
 
         return lattice;
     }
@@ -743,6 +754,12 @@ public class NullableAnalysis {
 
     boolean isName(AST.Expr e) {
         return e instanceof AST.NameExpr;
+    }
+
+    boolean isLogical(AST.Expr e) {
+        if (e instanceof AST.BinaryExpr binary)
+            return binary.op.str.equals("&&") || binary.op.str.equals("||");
+        return e instanceof AST.UnaryExpr unary && unary.op.str.equals("!");
     }
 
 }

@@ -255,7 +255,7 @@ public class TestNullAnalysis {
         analyze(src, "test");
     }
 
-    @Test
+    @Test(expected = CompilerException.class)
     public void knownNonNullArrayElement() {
         String src = """
         struct Foo { var value: Int }
@@ -309,6 +309,28 @@ public class TestNullAnalysis {
                     return null == f[1] && f0 != null && 1 == f0.i
                 }
 
+                """;
+        analyze(src, "foo");
+    }
+
+    @Test
+    public void testGuardedLogicalOr() {
+        String src = """
+                struct Foo { var i: Int }
+                func foo(f0: Foo?)->Int {
+                    return f0 == null || f0.i == 1
+                }
+                """;
+        analyze(src, "foo");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void testUnguardedLogicalAnd() {
+        String src = """
+                struct Foo { var i: Int }
+                func foo(f0: Foo?)->Int {
+                    return 1 == 1 && f0.i == 1
+                }
                 """;
         analyze(src, "foo");
     }
