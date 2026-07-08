@@ -6,7 +6,7 @@ An input program in the source language may go through many intermediate represe
 a compiler before it is in a form ready for execution.
 
 One of the first such intermediate representations that we have seen is the
-the Abstract Syntax Tree (AST), which is mainly concerned with the grammar of the source language.
+Abstract Syntax Tree (AST), which is mainly concerned with the grammar of the source language.
 
 From the AST, we generate a different kind of intermediate representation, one that is more amenable
 to the manipulations required during optimization and execution. There are many such representations; we will
@@ -19,7 +19,7 @@ limit ourselves to the following.
 Stack-Based IR
 ==============
 
-The stack based IR encodes stack operations as part of the intermediate representation. Lets look at a simple
+The stack based IR encodes stack operations as part of the intermediate representation. Let's look at a simple
 example::
 
    func foo(n: Int)->Int {
@@ -35,7 +35,7 @@ Produces::
 	   jump L1
    L1:
 
-The stack based IR is so called because many of the intructions in the IR push and pop values to/from an evaluation stack at
+The stack based IR is so called because many of the instructions in the IR push and pop values to/from an evaluation stack at
 runtime. Above for example, we have the following instructions:
 
 * ``load 0`` - this pushes the value of the input parameter ``n`` to the stack. The ``0`` here identifies the location of the variable ``n``.
@@ -51,7 +51,7 @@ equivalent, you can think of a label as indicating the start of a basic block, a
 a basic block.
 
 The idea is that inside a basic block, instructions execute linearly one after the other.
-Each basic block ends with a branching instruction, something like a goto or a conditional jump.
+Each non-exit basic block normally ends with a branching instruction, something like a goto or a conditional jump.
 
 Here is a simple example of input source code and the IR you might see::
 
@@ -105,7 +105,7 @@ Disadvantages
 
 Examples
 --------
-* `Example implementation in EeZee Programming Language <https://github.com/CompilerProgramming/ez-lang/tree/main/stackvm>`_.
+* `Example implementation in EeZee Programming Language <../stackvm>`_.
 * `Java Specifications <https://docs.oracle.com/javase/specs/jvms/se24/html/jvms-6.html>`_.
 * `Web Assembly Specifications <https://webassembly.github.io/spec/core/syntax/instructions.html>`_.
 
@@ -113,7 +113,7 @@ Register Based IR or Three-Address IR
 =====================================
 
 This intermediate representation uses named slots called virtual registers in the instruction when referencing
-values. Lets look at the same example we saw above::
+values. Let's look at the same example we saw above::
 
    func foo(n: Int)->Int {
       return n+1;
@@ -133,11 +133,10 @@ The instructions above are as follows:
   refers to a temporary, whereas ``n`` refers to the input argument ``n``. Both of these names are virtual registers.
 * ``ret %t1`` - is the return instruction, in this instance it references the temporary.
 
-The virtual registers in the IR are so called because they do not map to real registers in the target physical machine.
-Instead these are just named slots in the abstract machine responsible for executing the IR. Typically, the abstract machine
-will assign each virtual register a unique location in its stack frame. So we still end up using the function's
-stack frame, but the IR references locations within the stack frame directly using these virtual names, rather than implicitly
-through push and pop instructions. During optimization some of the virtual registers will end up in real hardware registers.
+The virtual registers in the IR are so called because they are not necessarily registers in a target physical machine.
+In the register VM and optimizing VM modules, they are named slots in the abstract machine responsible for executing the IR. The interpreter reads and writes these values through frame slots in the function's stack frame, so the IR references locations directly using virtual names rather than implicitly through push and pop instructions.
+
+The optimizing VM can run register allocation to map many virtual registers onto a smaller set of VM frame slots when their lifetimes do not overlap. That is different from native code generation, where a later backend may map values to real hardware registers or stack locations.
 
 Control flow is represented the same way as for the stack IR. Revisiting the same source example from above, we get following
 IR::
@@ -173,8 +172,8 @@ Disadvantages
 
 Examples
 --------
-* `Example basic register IR in EeZee Programming Language <https://github.com/CompilerProgramming/ez-lang/tree/main/registervm>`_.
-* `Example register IR including SSA form and optimizations in EeZee Programming Language <https://github.com/CompilerProgramming/ez-lang/tree/main/optvm>`_.
+* `Example basic register IR in EeZee Programming Language <../registervm>`_.
+* `Example register IR including SSA form and optimizations in EeZee Programming Language <../optvm>`_.
 * `LLVM instruction set <https://llvm.org/docs/LangRef.html#instruction-reference>`_.
 * `Android Dalvik IR <https://source.android.com/docs/core/runtime/dex-format>`_.
 
@@ -186,12 +185,12 @@ This IR is quite different from the IRs we described above.
 
 The key features of this IR are:
 
-* Instructions are NOT organized into Basic Blocks - instead, intructions form a graph, where
+* Instructions are NOT organized into Basic Blocks - instead, instructions form a graph, where
   each instruction has as its inputs the definitions it uses.
 * Instructions that produce data values are not directly bound to a Basic Block, instead they "float" around,
   the order being defined purely in terms of the dependencies between the instructions.
 * Control flow is represented in a similar way, and control flows between control flow
-  instructions. Dependencies between data instructions and control intructions occur at few well
+  instructions. Dependencies between data instructions and control instructions occur at few well
   defined places.
 * The IR as described above cannot be readily executed, because to execute the IR, the instructions
   must be scheduled; you can think of this as a process that puts the instructions into a traditional
