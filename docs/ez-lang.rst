@@ -20,7 +20,7 @@ Keywords
 --------
 Following are keywords in the language::
 
-    func var Int Float struct if else while break continue return null
+    func var new Int Float struct if else while break continue return null
 
 Source Unit
 -----------
@@ -230,6 +230,16 @@ Following table describes the available operators by their precedence (low to hi
 +------------+-----------------+----------+
 
 
+
+Floating point operands support the arithmetic operators ``+``, ``-``, ``*``, ``/``,
+the relational operators ``==``, ``!=``, ``<``, ``<=``, ``>``, ``>=``, and unary
+negation ``-``. The modulo operator ``%``, the logical operators ``&&`` and ``||``, and
+the unary ``!`` operator are not supported for floating point operands. A relational
+operator applied to floating point operands produces an ``Int`` result (``1`` or ``0``).
+
+There is no implicit conversion between ``Int`` and ``Float``. The two operands of a
+binary arithmetic or relational operator must be of the same type; mixing ``Int`` and
+``Float`` in a single operation is a type error.
 
 Grammar
 -------
