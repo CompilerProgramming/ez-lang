@@ -1,0 +1,6 @@
+func foo()->[Float] {
+  return new [Float]{4.2,8.4}
+}
+func bar()->Int {
+	return #foo()
+}

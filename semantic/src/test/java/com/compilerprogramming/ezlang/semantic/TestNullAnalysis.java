@@ -200,6 +200,28 @@ public class TestNullAnalysis {
         analyze(src, "test");
     }
 
+    @Test(expected = CompilerException.class)
+    public void nullableArrayLength() {
+        String src = """
+    func test(arg: [Int]?)->Int {
+        return #arg;
+    }
+""";
+        analyze(src, "test");
+    }
+
+    @Test
+    public void guardedNullableArrayLength() {
+        String src = """
+    func test(arg: [Int]?)->Int {
+        if (arg != null) {
+            return #arg;
+        }
+        return 0;
+    }
+""";
+        analyze(src, "test");
+    }
     @Test
     public void guardedNullableFieldStore() {
         String src = """

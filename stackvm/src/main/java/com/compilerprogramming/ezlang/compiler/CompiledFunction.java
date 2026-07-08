@@ -418,6 +418,7 @@ public class CompiledFunction {
         switch (unaryExpr.op.str) {
             case "-" -> opCode = unaryExpr.type instanceof EZType.EZTypeFloat ? Instruction.NEG_F : Instruction.NEG_I;
             case "!" -> opCode = Instruction.NOT;
+            case "#" -> opCode = Instruction.LENGTH;
             default -> throw new CompilerException("Invalid binary op", unaryExpr.lineNumber);
         }
         code(new Instruction.UnaryOp(opCode));

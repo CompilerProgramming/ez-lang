@@ -162,6 +162,15 @@ func foo()->Int {
     }
 
     @Test
+    public void testArrayLengthUnaryOperator() {
+        String src = """
+func foo()->Int {
+  return #new [Int]{42,84};
+}
+""";
+        compileSrc(src);
+    }
+    @Test
     public void test17() {
         String src = """
 struct T5 { var i: Int; var j: Int }
@@ -194,7 +203,7 @@ func foo()->Int {
         compileSrc(src);
     }
 
-        static void testCPU( String src, String cpu, String os, int spills, String stop ) {
+    static void testCPU( String src, String cpu, String os, int spills, String stop ) {
         CodeGen code = new CodeGen(src);
         code.parse().opto().typeCheck().loopTree().instSelect(cpu,os).GCM().localSched().regAlloc().encode();
         int delta = spills>>3;

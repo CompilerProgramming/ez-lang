@@ -98,7 +98,17 @@ public class SemaAssignTypes implements ASTVisitor {
             return;
         }
         validType(unaryExpr.expr.type, false, unaryExpr.lineNumber);
-        if (unaryExpr.expr.type instanceof EZType.EZTypeInteger) {
+        if (unaryExpr.op.str.equals("#")) {
+            if (unaryExpr.expr.type instanceof EZType.EZTypeArray ||
+                    (unaryExpr.expr.type instanceof EZType.EZTypeNullable nullable && nullable.baseType instanceof EZType.EZTypeArray)) {
+                unaryExpr.type = typeDictionary.INT;
+            }
+            else {
+                throw new CompilerException("Unary operator " + unaryExpr.op + " not supported for operand", unaryExpr.lineNumber);
+            }
+        }
+        else if (unaryExpr.expr.type instanceof EZType.EZTypeInteger &&
+                (unaryExpr.op.str.equals("-") || unaryExpr.op.str.equals("!"))) {
             unaryExpr.type = unaryExpr.expr.type;
         }
         else if (unaryExpr.expr.type instanceof EZType.EZTypeFloat && unaryExpr.op.str.equals("-")) {

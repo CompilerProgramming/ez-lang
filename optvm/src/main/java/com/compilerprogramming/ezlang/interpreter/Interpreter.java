@@ -153,6 +153,9 @@ public class Interpreter {
                     else if (unaryValue instanceof Value.FloatValue floatValue && unaryInst.unop.equals("-")) {
                         execStack.stack[base + unaryInst.result().frameSlot()] = new Value.FloatValue(-floatValue.value);
                     }
+                    else if (unaryValue instanceof Value.ArrayValue arrayValue && unaryInst.unop.equals("#")) {
+                        execStack.stack[base + unaryInst.result().frameSlot()] = new Value.IntegerValue(arrayValue.values.size());
+                    }
                     else
                         throw new IllegalStateException("Unexpected unary operand: " + unaryOperand);
                 }

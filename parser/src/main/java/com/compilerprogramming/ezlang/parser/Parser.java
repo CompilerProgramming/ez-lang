@@ -329,7 +329,8 @@ public class Parser {
 
     private AST.Expr parseUnary(Lexer lexer) {
         if (isToken(currentToken, "-")
-                || isToken(currentToken, "!")) {
+                || isToken(currentToken, "!")
+                || isToken(currentToken, "#")) {
             var tok = currentToken;
             nextToken(lexer);
             return new AST.UnaryExpr(tok, parseUnary(lexer), tok.lineNumber);

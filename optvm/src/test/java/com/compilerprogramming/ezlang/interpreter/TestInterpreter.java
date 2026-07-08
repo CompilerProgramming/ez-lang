@@ -1031,4 +1031,18 @@ func main()->Int
                 integerValue.value == 1);
     }
 
+    @Test
+    public void testArrayLengthUnaryOperator() {
+        String src = """
+                func foo()->Int {
+                    var a = new [Int] {1,2,3,4}
+                    var b = new [Int] {len=0,value=0}
+                    return #a + #b
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.IntegerValue integerValue
+                && integerValue.value == 4);
+    }
 }

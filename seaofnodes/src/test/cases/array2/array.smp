@@ -1,0 +1,9 @@
+val foo = {->
+  var a = new flt[2];
+  a[0] = 4.2;
+  a[1] = 8.4;
+  return a;
+};
+val bar = { ->
+	return foo()#;
+};

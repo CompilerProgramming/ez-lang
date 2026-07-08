@@ -1,0 +1,6 @@
+var foo = {->
+  var a = new int[2];
+  a[0] = 42;
+  a[1] = 84;
+  return a#;
+};

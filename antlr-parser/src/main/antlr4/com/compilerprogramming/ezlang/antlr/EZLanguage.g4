@@ -91,7 +91,7 @@ multiplicationExpression
     ;
 
 unaryExpression
-    : ('-' | '!') unaryExpression
+    : ('-' | '!' | '#') unaryExpression
     | postfixExpression
     ;
 
