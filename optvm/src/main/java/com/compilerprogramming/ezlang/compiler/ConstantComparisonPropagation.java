@@ -72,13 +72,13 @@ public class ConstantComparisonPropagation {
                         && binary.binOp.equals("==")) {
                     // Get the constant and the register operands
                     // from the binary
-                    Operand.ConstantOperand constantOp = null;
+                    Operand.IntConstantOperand constantOp = null;
                     Operand.RegisterOperand registerOp = null;
-                    if (binary.left() instanceof Operand.ConstantOperand leftConstant
+                    if (binary.left() instanceof Operand.IntConstantOperand leftConstant
                             && binary.right() instanceof Operand.RegisterOperand rightReg) {
                         constantOp = leftConstant;
                         registerOp = rightReg;
-                    } else if (binary.right() instanceof Operand.ConstantOperand rightConstant
+                    } else if (binary.right() instanceof Operand.IntConstantOperand rightConstant
                             && binary.left() instanceof Operand.RegisterOperand leftReg) {
                         constantOp = rightConstant;
                         registerOp = leftReg;

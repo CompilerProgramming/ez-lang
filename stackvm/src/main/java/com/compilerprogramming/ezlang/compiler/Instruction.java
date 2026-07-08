@@ -30,6 +30,12 @@ public class Instruction {
     public static final int GT = 22;
     public static final int LE = 23;
     public static final int GE = 24;
+    public static final int PUSH_F = 25;
+    public static final int ADD_F = 26;
+    public static final int SUB_F = 27;
+    public static final int MUL_F = 28;
+    public static final int DIV_F = 29;
+    public static final int NEG_F = 30;
 
     static final String[] opNames = {
         "ret",
@@ -56,7 +62,13 @@ public class Instruction {
         "lt",
         "gt",
         "le",
-        "ge"
+        "ge",
+        "pushf",
+        "addf",
+        "subf",
+        "mulf",
+        "divf",
+        "negf"
     };
 
     public final int opcode;
@@ -73,9 +85,9 @@ public class Instruction {
         return sb.append(opNames[opcode]);
     }
 
-    public static class PushConst extends Instruction {
+    public static class pushIntConstant extends Instruction {
         public final int value;
-        public PushConst(int value) {
+        public pushIntConstant(int value) {
             super(PUSH_I);
             this.value = value;
         }
@@ -85,6 +97,17 @@ public class Instruction {
         }
     }
 
+    public static class PushFloatConst extends Instruction {
+        public final double value;
+        public PushFloatConst(double value) {
+            super(PUSH_F);
+            this.value = value;
+        }
+        @Override
+        public StringBuilder toStr(StringBuilder sb) {
+            return super.toStr(sb).append(" ").append(value);
+        }
+    }
     public static class BinaryOp extends Instruction {
         public BinaryOp(int opcode) {
             super(opcode);

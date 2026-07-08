@@ -217,6 +217,7 @@ public class CompiledFunction {
         currentBreakTarget = exitBlock;
         currentContinueTarget = loopHead;
         startBlock(loopHead);   // ISSA cannot seal until all back edges done
+        checkConditionType(whileStmt.condition.type, whileStmt.lineNumber);
         boolean indexed = compileExpr(whileStmt.condition);
         if (indexed)
             codeIndexedLoad();
@@ -230,6 +231,11 @@ public class CompiledFunction {
         startSealedBlock(exitBlock);    // ISSA seal exit block (breaks already done)
         currentContinueTarget = savedContinueTarget;
         currentBreakTarget = savedBreakTarget;
+    }
+
+    private void checkConditionType(EZType conditionType, int lineNumber) {
+        if (!(conditionType instanceof EZType.EZTypeInteger))
+            throw new CompilerException("Condition expression must be Int type", lineNumber);
     }
 
     private boolean isBlockTerminated(BasicBlock block) {
@@ -260,6 +266,7 @@ public class CompiledFunction {
         boolean needElse = ifElseStmt.elseStmt != null;
         BasicBlock elseBlock = needElse ? createBlock() : null;
         BasicBlock exitBlock = createBlock();
+        checkConditionType(ifElseStmt.condition.type, ifElseStmt.lineNumber);
         boolean indexed = compileExpr(ifElseStmt.condition);
         if (indexed)
             codeIndexedLoad();
@@ -455,6 +462,8 @@ public class CompiledFunction {
     }
 
     private boolean codeBoolean(AST.BinaryExpr binaryExpr) {
+        checkConditionType(binaryExpr.expr1.type, binaryExpr.lineNumber);
+        checkConditionType(binaryExpr.expr2.type, binaryExpr.lineNumber);
         boolean isAnd = binaryExpr.op.str.equals("&&");
         BasicBlock l1 = createBlock();
         BasicBlock l2 = createBlock();
@@ -473,7 +482,7 @@ public class CompiledFunction {
         jumpTo(l3);
         startSealedBlock(l2);       // ISSA seal immediately
         // Below we must write to the same temp
-        codeMove(new Operand.ConstantOperand(isAnd ? 0 : 1, typeDictionary.INT), temp);
+        codeMove(new Operand.IntConstantOperand(isAnd ? 0 : 1, typeDictionary.INT), temp);
         jumpTo(l3);
         startSealedBlock(l3);       // ISSA seal immediately
         // leave temp on virtual stack
@@ -502,10 +511,10 @@ public class CompiledFunction {
                 case "!=": value = 0; break;
                 default: throw new CompilerException("Invalid binary op", binaryExpr.lineNumber);
             }
-            pushConstant(value, typeDictionary.INT);
+            pushIntConstant(value, typeDictionary.INT);
         }
-        else if (left instanceof Operand.ConstantOperand leftconstant &&
-                right instanceof Operand.ConstantOperand rightconstant) {
+        else if (left instanceof Operand.IntConstantOperand leftconstant &&
+                right instanceof Operand.IntConstantOperand rightconstant) {
             long value = 0;
             switch (opCode) {
                 case "+": value = leftconstant.value + rightconstant.value; break;
@@ -518,10 +527,26 @@ public class CompiledFunction {
                 case "<": value = leftconstant.value < rightconstant.value ? 1: 0; break;
                 case ">": value = leftconstant.value > rightconstant.value ? 1 : 0; break;
                 case "<=": value = leftconstant.value <= rightconstant.value ? 1 : 0; break;
-                case ">=": value = leftconstant.value <= rightconstant.value ? 1 : 0; break;
+                case ">=": value = leftconstant.value >= rightconstant.value ? 1 : 0; break;
                 default: throw new CompilerException("Invalid binary op", binaryExpr.lineNumber);
             }
-            pushConstant(value, leftconstant.type);
+            pushIntConstant(value, binaryExpr.type);
+        }
+        else if (left instanceof Operand.FloatConstantOperand leftconstant &&
+                 right instanceof Operand.FloatConstantOperand rightconstant) {
+            switch (opCode) {
+                case "+" -> pushFloatConstant(leftconstant.value + rightconstant.value, binaryExpr.type);
+                case "-" -> pushFloatConstant(leftconstant.value - rightconstant.value, binaryExpr.type);
+                case "*" -> pushFloatConstant(leftconstant.value * rightconstant.value, binaryExpr.type);
+                case "/" -> pushFloatConstant(leftconstant.value / rightconstant.value, binaryExpr.type);
+                case "==" -> pushIntConstant(leftconstant.value == rightconstant.value ? 1 : 0, binaryExpr.type);
+                case "!=" -> pushIntConstant(leftconstant.value != rightconstant.value ? 1 : 0, binaryExpr.type);
+                case "<" -> pushIntConstant(leftconstant.value < rightconstant.value ? 1 : 0, binaryExpr.type);
+                case ">" -> pushIntConstant(leftconstant.value > rightconstant.value ? 1 : 0, binaryExpr.type);
+                case "<=" -> pushIntConstant(leftconstant.value <= rightconstant.value ? 1 : 0, binaryExpr.type);
+                case ">=" -> pushIntConstant(leftconstant.value >= rightconstant.value ? 1 : 0, binaryExpr.type);
+                default -> throw new CompilerException("Invalid binary op", binaryExpr.lineNumber);
+            }
         }
         else {
             var temp = createTemp(binaryExpr.type);
@@ -537,11 +562,17 @@ public class CompiledFunction {
             codeIndexedLoad();
         opCode = unaryExpr.op.str;
         Operand top = pop();
-        if (top instanceof Operand.ConstantOperand constant) {
+        if (top instanceof Operand.IntConstantOperand constant) {
             switch (opCode) {
-                case "-": pushConstant(-constant.value, constant.type); break;
+                case "-": pushIntConstant(-constant.value, constant.type); break;
                 // Maybe below we should explicitly set Int
-                case "!": pushConstant(constant.value == 0?1:0, constant.type); break;
+                case "!": pushIntConstant(constant.value == 0?1:0, typeDictionary.INT); break;
+                default: throw new CompilerException("Invalid unary op", unaryExpr.lineNumber);
+            }
+        }
+        else if (top instanceof Operand.FloatConstantOperand constant) {
+            switch (opCode) {
+                case "-": pushFloatConstant(-constant.value, constant.type); break;
                 default: throw new CompilerException("Invalid unary op", unaryExpr.lineNumber);
             }
         }
@@ -554,15 +585,21 @@ public class CompiledFunction {
 
     private boolean compileConstantExpr(AST.LiteralExpr constantExpr) {
         if (constantExpr.type instanceof EZType.EZTypeInteger)
-            pushConstant(constantExpr.value.num.intValue(), constantExpr.type);
+            pushIntConstant(constantExpr.value.num.intValue(), constantExpr.type);
+        else if (constantExpr.type instanceof EZType.EZTypeFloat)
+            pushFloatConstant(constantExpr.value.num.doubleValue(), constantExpr.type);
         else if (constantExpr.type instanceof EZType.EZTypeNull)
             pushNullConstant(constantExpr.type);
         else throw new CompilerException("Invalid constant type", constantExpr.lineNumber);
         return false;
     }
 
-    private void pushConstant(long value, EZType type) {
-        pushOperand(new Operand.ConstantOperand(value, type));
+    private void pushIntConstant(long value, EZType type) {
+        pushOperand(new Operand.IntConstantOperand(value, type));
+    }
+
+    private void pushFloatConstant(double value, EZType type) {
+        pushOperand(new Operand.FloatConstantOperand(value, type));
     }
 
     private void pushNullConstant(EZType type) {
@@ -576,7 +613,9 @@ public class CompiledFunction {
     }
 
     EZType typeOfOperand(Operand operand) {
-        if (operand instanceof Operand.ConstantOperand constant)
+        if (operand instanceof Operand.IntConstantOperand constant)
+            return constant.type;
+        else if (operand instanceof Operand.FloatConstantOperand constant)
             return constant.type;
         else if (operand instanceof Operand.NullConstantOperand nullConstantOperand)
             return nullConstantOperand.type;
@@ -594,7 +633,8 @@ public class CompiledFunction {
 
     private Operand.RegisterOperand ensureTemp() {
         Operand top = top();
-        if (top instanceof Operand.ConstantOperand
+        if (top instanceof Operand.IntConstantOperand
+                || top instanceof Operand.FloatConstantOperand
                 || top instanceof Operand.NullConstantOperand
                 || top instanceof Operand.LocalRegisterOperand) {
             return createTempAndMove(pop());

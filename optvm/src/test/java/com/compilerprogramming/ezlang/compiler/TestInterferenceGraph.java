@@ -25,7 +25,7 @@ public class TestInterferenceGraph {
                 "+",
                 new Operand.RegisterOperand(a),
                 new Operand.RegisterOperand(b),
-                new Operand.ConstantOperand(1, typeDictionary.INT)));
+                new Operand.IntConstantOperand(1, typeDictionary.INT)));
         function.code(new Instruction.Binary(
                 "*",
                 new Operand.RegisterOperand(c),
@@ -35,7 +35,7 @@ public class TestInterferenceGraph {
                 "+",
                 new Operand.RegisterOperand(b),
                 new Operand.RegisterOperand(c),
-                new Operand.ConstantOperand(1, typeDictionary.INT)));
+                new Operand.IntConstantOperand(1, typeDictionary.INT)));
         function.code(new Instruction.Binary(
                 "*",
                 new Operand.RegisterOperand(d),
@@ -95,7 +95,7 @@ public class TestInterferenceGraph {
         BasicBlock b3 = function.createBlock();
 
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(a)));
         function.code(new Instruction.ConditionalBranch(
                 function.currentBlock,
@@ -105,7 +105,7 @@ public class TestInterferenceGraph {
         function.currentBlock.addSuccessor(b2);
         function.startBlock(b1);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(2, typeDictionary.INT),
+                new Operand.IntConstantOperand(2, typeDictionary.INT),
                 new Operand.RegisterOperand(b)));
         function.code(new Instruction.Move(
                 new Operand.RegisterOperand(b),
@@ -113,7 +113,7 @@ public class TestInterferenceGraph {
         function.jumpTo(b3);
         function.startBlock(b2);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(c)));
         function.code(new Instruction.Move(
                 new Operand.RegisterOperand(c),
@@ -169,10 +169,10 @@ public class TestInterferenceGraph {
         Register t = regPool.newReg("t", typeDictionary.INT);
 
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(a)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(2, typeDictionary.INT),
+                new Operand.IntConstantOperand(2, typeDictionary.INT),
                 new Operand.RegisterOperand(b)));
         function.code(new Instruction.Move(
                 new Operand.RegisterOperand(b),

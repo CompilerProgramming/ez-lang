@@ -9,9 +9,9 @@ public class Operand {
 
     EZType type;
 
-    public static class ConstantOperand extends Operand {
+    public static class IntConstantOperand extends Operand {
         public final long value;
-        public ConstantOperand(long value, EZType type) {
+        public IntConstantOperand(long value, EZType type) {
             this.value = value;
             this.type = type;
         }
@@ -24,8 +24,33 @@ public class Operand {
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            ConstantOperand that = (ConstantOperand) o;
+            IntConstantOperand that = (IntConstantOperand) o;
             return value == that.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(value);
+        }
+    }
+
+    public static class FloatConstantOperand extends Operand {
+        public final double value;
+        public FloatConstantOperand(double value, EZType type) {
+            this.value = value;
+            this.type = type;
+        }
+        @Override
+        public String toString() {
+            return String.valueOf(value);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            FloatConstantOperand that = (FloatConstantOperand) o;
+            return Double.compare(value, that.value) == 0;
         }
 
         @Override

@@ -5,12 +5,14 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 public final class TypeDictionary extends Scope {
     public final EZType.EZTypeUnknown UNKNOWN;
     public final EZType.EZTypeInteger INT;
+    public final EZType.EZTypeFloat FLOAT;
     public final EZType.EZTypeNull NULL;
     public final EZType.EZTypeVoid VOID;
 
     public TypeDictionary() {
         super(null);
         INT = (EZType.EZTypeInteger) intern(new EZType.EZTypeInteger());
+        FLOAT = (EZType.EZTypeFloat) intern(new EZType.EZTypeFloat());
         UNKNOWN = (EZType.EZTypeUnknown) intern(new EZType.EZTypeUnknown());
         NULL = (EZType.EZTypeNull) intern(new EZType.EZTypeNull());
         VOID = (EZType.EZTypeVoid) intern(new EZType.EZTypeVoid());
@@ -19,6 +21,10 @@ public final class TypeDictionary extends Scope {
         switch (elementType) {
             case EZType.EZTypeInteger ti -> {
                 var arrayType = intern(new EZType.EZTypeArray(ti));
+                return isNullable ? intern(new EZType.EZTypeNullable(arrayType)) : arrayType;
+            }
+            case EZType.EZTypeFloat tf -> {
+                var arrayType = intern(new EZType.EZTypeArray(tf));
                 return isNullable ? intern(new EZType.EZTypeNullable(arrayType)) : arrayType;
             }
             case EZType.EZTypeStruct ts -> {

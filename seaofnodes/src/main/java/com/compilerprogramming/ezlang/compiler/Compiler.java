@@ -93,11 +93,15 @@ public class Compiler {
 
 
     private void populateDefaultTypes(Map<String, Type> types) {
-        // Pre-create int, [int] and *[int] types
+        // Pre-create primitive and primitive array types
         types.put(typeDictionary.INT.name(), TypeInteger.BOT);
+        types.put(typeDictionary.FLOAT.name(), TypeFloat.F64);
         var intArrayType = TypeStruct.makeAry(TypeInteger.U32, _code.getALIAS(), TypeInteger.BOT, _code.getALIAS());
         var ptrIntArrayType = TypeMemPtr.make(intArrayType);
         types.put("[" + typeDictionary.INT.name() + "]", ptrIntArrayType);
+        var floatArrayType = TypeStruct.makeAry(TypeInteger.U32, _code.getALIAS(), TypeFloat.F64, _code.getALIAS());
+        var ptrFloatArrayType = TypeMemPtr.make(floatArrayType);
+        types.put("[" + typeDictionary.FLOAT.name() + "]", ptrFloatArrayType);
         // Also get the types created by default
         for (Type t: Type.gather()) {
             types.put(t.str(), t);
@@ -185,6 +189,9 @@ public class Compiler {
         else if (type instanceof EZType.EZTypeInteger ||
                  type instanceof EZType.EZTypeVoid) {
             return TypeInteger.BOT.str();
+        }
+        else if (type instanceof EZType.EZTypeFloat) {
+            return TypeFloat.F64.str();
         }
         else if (type instanceof EZType.EZTypeNull) {
             return TypeNil.NIL.str();
@@ -571,7 +578,12 @@ public class Compiler {
     private Node compileUnaryExpr(AST.UnaryExpr unaryExpr) {
         String opCode = unaryExpr.op.str;
         switch (opCode) {
-            case "-": return peep(new MinusNode(compileExpr(unaryExpr.expr)).widen());
+            case "-": {
+                Node expr = compileExpr(unaryExpr.expr);
+                return unaryExpr.type instanceof EZType.EZTypeFloat
+                    ? peep(new MinusFNode(expr))
+                    : peep(new MinusNode(expr).widen());
+            }
             // Maybe below we should explicitly set Int
             case "!": return peep(new NotNode(compileExpr(unaryExpr.expr)));
             default: throw new CompilerException("Invalid unary op", unaryExpr.lineNumber);
@@ -588,34 +600,34 @@ public class Compiler {
             case "||":
                 throw new CompilerException("Not yet implemented", binaryExpr.lineNumber);
             case "==":
-                idx=2;  lhs = new BoolNode.EQ(lhs, null);
+                idx=2;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.EQF(lhs, null) : new BoolNode.EQ(lhs, null);
                 break;
             case "!=":
-                idx=2;  lhs = new BoolNode.EQ(lhs, null); negate=true;
+                idx=2;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.EQF(lhs, null) : new BoolNode.EQ(lhs, null); negate=true;
                 break;
             case "<=":
-                idx=2;  lhs = new BoolNode.LE(lhs, null);
+                idx=2;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.LEF(lhs, null) : new BoolNode.LE(lhs, null);
                 break;
             case "<":
-                idx=2;  lhs = new BoolNode.LT(lhs, null);
+                idx=2;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.LTF(lhs, null) : new BoolNode.LT(lhs, null);
                 break;
             case ">=":
-                idx=1;  lhs = new BoolNode.LE(null, lhs);
+                idx=1;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.LEF(null, lhs) : new BoolNode.LE(null, lhs);
                 break;
             case ">":
-                idx=1;  lhs = new BoolNode.LT(null, lhs);
+                idx=1;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.LTF(null, lhs) : new BoolNode.LT(null, lhs);
                 break;
             case "+":
-                idx=2; lhs = new AddNode(lhs,null);
+                idx=2; lhs = binaryExpr.type instanceof EZType.EZTypeFloat ? new AddFNode(lhs,null) : new AddNode(lhs,null);
                 break;
             case "-":
-                idx=2; lhs = new SubNode(lhs,null);
+                idx=2; lhs = binaryExpr.type instanceof EZType.EZTypeFloat ? new SubFNode(lhs,null) : new SubNode(lhs,null);
                 break;
             case "*":
-                idx=2; lhs = new MulNode(lhs,null);
+                idx=2; lhs = binaryExpr.type instanceof EZType.EZTypeFloat ? new MulFNode(lhs,null) : new MulNode(lhs,null);
                 break;
             case "/":
-                idx=2; lhs = new DivNode(lhs,null);
+                idx=2; lhs = binaryExpr.type instanceof EZType.EZTypeFloat ? new DivFNode(lhs,null) : new DivNode(lhs,null);
                 break;
             default:
                 throw new CompilerException("Not yet implemented", binaryExpr.lineNumber);
@@ -630,6 +642,8 @@ public class Compiler {
     private Node compileConstantExpr(AST.LiteralExpr constantExpr) {
         if (constantExpr.type instanceof EZType.EZTypeInteger)
             return con(constantExpr.value.num.intValue());
+        else if (constantExpr.type instanceof EZType.EZTypeFloat)
+            return con(TypeFloat.constant(constantExpr.value.num.doubleValue()));
         else if (constantExpr.type instanceof EZType.EZTypeNull)
             return NIL;
         else throw new CompilerException("Invalid constant type", constantExpr.lineNumber);
@@ -798,6 +812,7 @@ public class Compiler {
         _xScopes.push(_scope = _scope.dup(true)); // The true argument triggers creating phis
 
         // Parse predicate
+        checkConditionType(whileStmt.condition.type, whileStmt.lineNumber);
         var pred = compileExpr(whileStmt.condition);
 
         // IfNode takes current control and predicate
@@ -854,7 +869,13 @@ public class Compiler {
         return ZERO;
     }
 
+    private void checkConditionType(EZType conditionType, int lineNumber) {
+        if (!(conditionType instanceof EZType.EZTypeInteger))
+            throw new CompilerException("Condition expression must be Int type", lineNumber);
+    }
+
     private Node compileIf(AST.IfElseStmt ifElseStmt) {
+        checkConditionType(ifElseStmt.condition.type, ifElseStmt.lineNumber);
         var pred = compileExpr(ifElseStmt.condition).keep();
         // IfNode takes current control and predicate
         Node ifNode = new IfNode(ctrl(), pred).peephole();

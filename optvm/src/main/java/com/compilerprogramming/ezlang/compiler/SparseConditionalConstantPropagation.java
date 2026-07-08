@@ -202,9 +202,11 @@ public class SparseConditionalConstantPropagation {
     private void replaceVarsWithConstants() {
         for (var register: valueLattice.getRegisters()) {
             var latticeElement = valueLattice.get(register);
-            if (latticeElement.kind == V_CONSTANT) {
-                var constant = new Operand.ConstantOperand(latticeElement.value, register.type);
+            if (latticeElement.isReplaceableConstant()) {
+                var constant = latticeElement.asOperand(register.type);
                 var defUseChain = this.ssaEdges.get(register);
+                if (defUseChain == null)
+                    continue;
                 // replace uses with constant
                 for (var usingInstruction: defUseChain.useList) {
                     if (executableBlocks.get(usingInstruction.block.bid))
@@ -219,67 +221,149 @@ public class SparseConditionalConstantPropagation {
         }
     }
 
-    static final byte V_UNDEFINED = 1;  // TOP
-    static final byte V_CONSTANT = 2;
-    static final byte V_VARYING = 3;    // BOTTOM
+    static final byte F_TOP = 0;             // no usable fact yet
+
+    static final byte F_REF_TOP = 1;         // known reference type, value unknown
+    static final byte F_REF_NOT_NULL = 2;
+    static final byte F_REF_NULL = 3;
+    static final byte F_REF_BOTTOM = 4;      // maybe null
+
+    static final byte F_INT_TOP = 5;         // known int type, value unknown
+    static final byte F_INT_ZERO = 6;
+    static final byte F_INT_NONZERO_CONST = 7;
+    static final byte F_INT_NONZERO_VARYING = 8;
+    static final byte F_INT_BOTTOM = 9;      // may be zero or non-zero
+
+    static final byte F_FLT_TOP = 10;        // known float type, value unknown
+    static final byte F_FLT_CONST = 11;
+    static final byte F_FLT_BOTTOM = 12;     // non-const float
+
+    static final byte F_BOTTOM = 13;         // impossible / contradiction
 
     // Associated with each register
     static final class LatticeElement {
         private byte kind;
-        private long value;
+        private long intValue;
+        private double floatValue;
 
-        public LatticeElement(byte kind, long value) {
-            this.kind = kind;
-            this.value = value;
-        }
+        LatticeElement(byte kind) { this.kind = kind; }
+        LatticeElement(byte kind, long value) { this.kind = kind; this.intValue = value; }
+        LatticeElement(long value) { kind = F_INT_TOP; setIntValue(value); }
+        LatticeElement(double value) { kind = F_FLT_TOP; setFloatValue(value); }
+        LatticeElement copy() { var copy = new LatticeElement(kind, intValue); copy.floatValue = floatValue; return copy; }
+        void copyFrom(LatticeElement other) { kind = other.kind; intValue = other.intValue; floatValue = other.floatValue; }
 
-        boolean meet(long value) {
-            byte oldKind = this.kind;
-            long oldValue = this.value;
-            if (kind == V_UNDEFINED) {
-                kind = V_CONSTANT;
-                this.value = value;
-            } else if (kind == V_CONSTANT && this.value != value) {
-                kind = V_VARYING;
-            }
-            return kind != oldKind || value != oldValue;
+        boolean isTrue() { return kind == F_INT_NONZERO_CONST || kind == F_INT_NONZERO_VARYING; }
+        boolean isFalse() { return kind == F_INT_ZERO; }
+        boolean isIntegerConstant() { return kind == F_INT_ZERO || kind == F_INT_NONZERO_CONST; }
+        boolean isFloatConstant() { return kind == F_FLT_CONST; }
+        boolean isNullConstant() { return kind == F_REF_NULL; }
+        boolean isDefiniteReference() { return kind == F_REF_NULL || kind == F_REF_NOT_NULL; }
+        boolean isReplaceableConstant() { return isIntegerConstant() || isFloatConstant() || isNullConstant(); }
+
+        boolean setIntValue(long value) {
+            byte old = kind;
+            if (kind == F_TOP || kind == F_INT_TOP) { intValue = value; kind = value == 0 ? F_INT_ZERO : F_INT_NONZERO_CONST; }
+            else if (kind == F_INT_ZERO && value != 0) kind = F_INT_BOTTOM;
+            else if (kind == F_INT_NONZERO_CONST && (value == 0 || value != intValue)) kind = F_INT_BOTTOM;
+            else if (!isInteger()) kind = F_BOTTOM;
+            return kind != old;
         }
+        boolean setFloatValue(double value) {
+            byte old = kind;
+            if (kind == F_TOP || kind == F_FLT_TOP) { floatValue = value; kind = F_FLT_CONST; }
+            else if (kind == F_FLT_CONST && Double.compare(value, floatValue) != 0) kind = F_FLT_BOTTOM;
+            else if (!isFloat()) kind = F_BOTTOM;
+            return kind != old;
+        }
+        boolean meetWithTypeBottom(EZType type) { return meet(factBottomFromType(type)); }
 
         boolean meet(LatticeElement other) {
-            byte oldKind = this.kind;
-            long oldValue = this.value;
-            if (kind == V_UNDEFINED) {
-                kind = other.kind;
-                value = other.value;
-            } else if (kind == V_CONSTANT) {
-                if (other.kind == V_CONSTANT) {
-                    if (other.value != value) {
-                        kind = V_VARYING;
-                    }
-                } else if (other.kind == V_VARYING) {
-                    kind = V_VARYING;
-                }
+            byte old = kind;
+            long oldInt = intValue;
+            double oldFloat = floatValue;
+            if (kind == F_TOP) { copyFrom(other); return changed(old, oldInt, oldFloat); }
+            if (kind == F_BOTTOM || other.kind == F_TOP) return false;
+            if (other.kind == F_BOTTOM) { kind = F_BOTTOM; return changed(old, oldInt, oldFloat); }
+            if (kind == other.kind) {
+                if (kind == F_INT_NONZERO_CONST && intValue != other.intValue) kind = F_INT_NONZERO_VARYING;
+                else if (kind == F_FLT_CONST && Double.compare(floatValue, other.floatValue) != 0) kind = F_FLT_BOTTOM;
+                return changed(old, oldInt, oldFloat);
             }
-            return kind != oldKind || value != oldValue;
+            if (isReference(kind) && isReference(other.kind)) { kind = meetReference(other); return changed(old, oldInt, oldFloat); }
+            if (isInteger(kind) && isInteger(other.kind)) { meetInteger(other); return changed(old, oldInt, oldFloat); }
+            if (isFloat(kind) && isFloat(other.kind)) { meetFloat(other); return changed(old, oldInt, oldFloat); }
+            kind = F_BOTTOM;
+            return changed(old, oldInt, oldFloat);
         }
+        private boolean changed(byte oldKind, long oldInt, double oldFloat) { return kind != oldKind || intValue != oldInt || Double.compare(floatValue, oldFloat) != 0; }
+        private byte meetReference(LatticeElement other) {
+            if (kind == F_REF_TOP) return other.kind;
+            if (other.kind == F_REF_TOP) return kind;
+            return switch (kind) {
+                case F_REF_NULL -> other.kind == F_REF_NULL ? F_REF_NULL : F_REF_BOTTOM;
+                case F_REF_NOT_NULL -> other.kind == F_REF_NOT_NULL ? F_REF_NOT_NULL : F_REF_BOTTOM;
+                case F_REF_BOTTOM -> F_REF_BOTTOM;
+                default -> F_BOTTOM;
+            };
+        }
+        private void meetInteger(LatticeElement other) {
+            if (kind == F_INT_TOP) { copyFrom(other); return; }
+            if (other.kind == F_INT_TOP) return;
+            switch (kind) {
+                case F_INT_ZERO -> { if (other.kind != F_INT_ZERO) kind = F_INT_BOTTOM; }
+                case F_INT_NONZERO_CONST -> {
+                    switch (other.kind) {
+                        case F_INT_NONZERO_CONST -> { if (intValue != other.intValue) kind = F_INT_NONZERO_VARYING; }
+                        case F_INT_NONZERO_VARYING -> kind = F_INT_NONZERO_VARYING;
+                        case F_INT_ZERO, F_INT_BOTTOM -> kind = F_INT_BOTTOM;
+                    }
+                }
+                case F_INT_NONZERO_VARYING -> { if (other.kind == F_INT_ZERO || other.kind == F_INT_BOTTOM) kind = F_INT_BOTTOM; }
+                case F_INT_BOTTOM -> { }
+            }
+        }
+        private void meetFloat(LatticeElement other) {
+            if (kind == F_FLT_TOP) { copyFrom(other); return; }
+            if (other.kind == F_FLT_TOP) return;
+            if (kind == F_FLT_CONST && (other.kind == F_FLT_BOTTOM || (other.kind == F_FLT_CONST && Double.compare(floatValue, other.floatValue) != 0)))
+                kind = F_FLT_BOTTOM;
+        }
+        boolean isReference() { return isReference(kind); }
+        boolean isInteger() { return isInteger(kind); }
+        boolean isFloat() { return isFloat(kind); }
+        private static boolean isReference(byte kind) { return kind >= F_REF_TOP && kind <= F_REF_BOTTOM; }
+        private static boolean isInteger(byte kind) { return kind >= F_INT_TOP && kind <= F_INT_BOTTOM; }
+        private static boolean isFloat(byte kind) { return kind >= F_FLT_TOP && kind <= F_FLT_BOTTOM; }
 
-        public boolean setKind(byte kind) {
-            byte oldKind = this.kind;
-            this.kind = kind;
-            return oldKind != kind;
+        Operand asOperand(EZType type) {
+            if (kind == F_INT_ZERO) return new Operand.IntConstantOperand(0, type);
+            if (kind == F_INT_NONZERO_CONST) return new Operand.IntConstantOperand(intValue, type);
+            if (kind == F_FLT_CONST) return new Operand.FloatConstantOperand(floatValue, type);
+            if (kind == F_REF_NULL) return new Operand.NullConstantOperand(type);
+            throw new IllegalStateException("Lattice value is not a constant: " + this);
         }
         @Override
         public String toString() {
-            if (kind == V_UNDEFINED) {
-                return "undefined";
-            }
-            else if (kind == V_CONSTANT) {
-                return String.valueOf(value);
-            }
-            return "varying";
+            return switch (kind) {
+                case F_TOP -> "T";
+                case F_REF_TOP -> "ref";
+                case F_INT_TOP -> "int";
+                case F_FLT_TOP -> "flt";
+                case F_REF_NOT_NULL -> "not-null";
+                case F_REF_NULL -> "null";
+                case F_REF_BOTTOM -> "maybe-null";
+                case F_INT_BOTTOM -> "int*";
+                case F_FLT_BOTTOM -> "flt*";
+                case F_INT_ZERO -> "0";
+                case F_INT_NONZERO_CONST -> Long.toString(intValue);
+                case F_INT_NONZERO_VARYING -> "non-zero";
+                case F_FLT_CONST -> Double.toString(floatValue);
+                case F_BOTTOM -> "⊥";
+                default -> throw new CompilerException("Unknown lattice kind: " + kind);
+            };
         }
     }
-
     // A CFG edge
     static final class FlowEdge {
         BasicBlock source;
@@ -330,117 +414,84 @@ public class SparseConditionalConstantPropagation {
                     var cell = valueLattice.get(toReg.reg);
                     if (moveInst.from() instanceof Operand.RegisterOperand fromReg) {
                         changed = cell.meet(valueLattice.get(fromReg.reg));
-                    } else if (moveInst.from() instanceof Operand.ConstantOperand constantOperand) {
-                        changed = cell.meet(constantOperand.value);
+                    } else if (isConstantOperand(moveInst.from())) {
+                        changed = cell.meet(factFromOperand(moveInst.from()));
                     } else throw new IllegalStateException();
                 } else throw new IllegalStateException();
             }
-            case Instruction.Jump jumpInst -> {
-                changed = markEdgeExecutable(block, jumpInst.jumpTo);
-            }
+            case Instruction.Jump jumpInst -> changed = markEdgeExecutable(block, jumpInst.jumpTo);
             case Instruction.ConditionalBranch cbrInst -> {
-                if (cbrInst.condition() instanceof Operand.RegisterOperand registerOperand) {
-                    var cell = valueLattice.get(registerOperand.reg);
-                    if (cell.kind == V_CONSTANT) {
-                        if (cell.value != 0) {
-                            changed = markEdgeExecutable(block, cbrInst.trueBlock);
-                        } else {
-                            changed = markEdgeExecutable(block, cbrInst.falseBlock);
-                        }
-                    } else if (cell.kind == V_VARYING) {
-                        boolean changed0 = markEdgeExecutable(block, cbrInst.trueBlock);
-                        boolean changed1 = markEdgeExecutable(block, cbrInst.falseBlock);
-                        changed = changed0 || changed1;
-                    }
-                } else if (cbrInst.condition() instanceof Operand.ConstantOperand constantOperand) {
-                    if (constantOperand.value != 0) {
-                        changed = markEdgeExecutable(block, cbrInst.trueBlock);
-                    } else {
-                        changed = markEdgeExecutable(block, cbrInst.falseBlock);
-                    }
-                } else throw new IllegalStateException();
+                LatticeElement condition;
+                if (cbrInst.condition() instanceof Operand.RegisterOperand registerOperand)
+                    condition = valueLattice.get(registerOperand.reg);
+                else if (isConstantOperand(cbrInst.condition()))
+                    condition = factFromOperand(cbrInst.condition());
+                else
+                    throw new IllegalStateException();
+
+                if (condition.isFloat() || condition.isReference())
+                    throw new CompilerException("Condition expression must be Int type");
+                if (condition.isFalse())
+                    changed = markEdgeExecutable(block, cbrInst.falseBlock);
+                else if (condition.isTrue())
+                    changed = markEdgeExecutable(block, cbrInst.trueBlock);
+                else if (condition.kind == F_INT_BOTTOM || condition.kind == F_BOTTOM) {
+                    boolean changed0 = markEdgeExecutable(block, cbrInst.trueBlock);
+                    boolean changed1 = markEdgeExecutable(block, cbrInst.falseBlock);
+                    changed = changed0 || changed1;
+                }
             }
             case Instruction.Call callInst -> {
                 if (!(callInst.callee.returnType instanceof EZType.EZTypeVoid)) {
                     var cell = valueLattice.get(callInst.returnOperand().reg);
-                    changed = cell.setKind(V_VARYING);
+                    changed = cell.meetWithTypeBottom(callInst.returnOperand().reg.type);
                 }
             }
             case Instruction.Unary unaryInst -> {
-                Operand.RegisterOperand unaryOperand = (Operand.RegisterOperand) unaryInst.operand();
                 var cell = valueLattice.get(unaryInst.result().reg);
-                var input = valueLattice.get(unaryOperand.reg);
-                if (input.kind == V_CONSTANT) {
-                    changed = cell.meet(unaryInst.unop.equals("-") ? -input.value : (input.value == 0 ? 1 : 0));
-                } else {
-                    changed = cell.meet(input);
-                }
+                LatticeElement input = factFromOperandOrRegister(unaryInst.operand());
+                changed = input == null ? cell.meetWithTypeBottom(unaryInst.result().reg.type) : evalUnary(cell, input, unaryInst.unop, unaryInst.result().reg.type);
             }
             case Instruction.Binary binaryInst -> {
                 var cell = valueLattice.get(binaryInst.result().reg);
-                LatticeElement left = null;
-                LatticeElement right = null;
-                // TODO we cannot yet evaluate null in comparisons
-                if (binaryInst.left() instanceof Operand.ConstantOperand constant)
-                    left = new LatticeElement(V_CONSTANT, constant.value);
-                else if (binaryInst.left() instanceof Operand.RegisterOperand registerOperand)
-                    left = valueLattice.get(registerOperand.reg);
-                if (binaryInst.right() instanceof Operand.ConstantOperand constant)
-                    right = new LatticeElement(V_CONSTANT, constant.value);
-                else if (binaryInst.right() instanceof Operand.RegisterOperand registerOperand)
-                    right = valueLattice.get(registerOperand.reg);
+                LatticeElement left = factFromOperandOrRegister(binaryInst.left());
+                LatticeElement right = factFromOperandOrRegister(binaryInst.right());
                 if (left != null && right != null) {
                     switch (binaryInst.binOp) {
-                        case "+":
-                        case "-":
-                        case "*":
-                        case "/":
-                        case "%":
-                            changed = evalArith(cell, left, right, binaryInst.binOp);
-                            break;
-                        case "==":
-                        case "!=":
-                        case "<":
-                        case ">":
-                        case "<=":
-                        case ">=":
-                            changed = evalLogical(cell, left, right, binaryInst.binOp);
-                            break;
-                        default:
-                            throw new IllegalStateException();
+                        case "+", "-", "*", "/", "%" -> changed = evalArith(cell, left, right, binaryInst.binOp, binaryInst.result().reg.type);
+                        case "==", "!=", "<", ">", "<=", ">=" -> changed = evalLogical(cell, left, right, binaryInst.binOp, binaryInst.result().reg.type);
+                        default -> throw new IllegalStateException();
                     }
                 }
                 else {
-                    cell.setKind(V_VARYING);
+                    changed = cell.meetWithTypeBottom(binaryInst.result().reg.type);
                 }
             }
             case Instruction.NewArray newArrayInst -> {
                 var cell = valueLattice.get(newArrayInst.destOperand().reg);
-                changed = cell.setKind(V_VARYING);
+                changed = cell.meet(new LatticeElement(F_REF_NOT_NULL));
             }
             case Instruction.NewStruct newStructInst -> {
                 var cell = valueLattice.get(newStructInst.destOperand().reg);
-                changed = cell.setKind(V_VARYING);
+                changed = cell.meet(new LatticeElement(F_REF_NOT_NULL));
             }
             case Instruction.ArrayStore arrayStoreInst -> {
             }
             case Instruction.ArrayLoad arrayLoadInst -> {
                 var cell = valueLattice.get(arrayLoadInst.destOperand().reg);
-                changed = cell.setKind(V_VARYING);
+                changed = cell.meetWithTypeBottom(arrayLoadType(arrayLoadInst));
             }
             case Instruction.SetField setFieldInst -> {
             }
             case Instruction.GetField getFieldInst -> {
                 var cell = valueLattice.get(getFieldInst.destOperand().reg);
-                changed = cell.setKind(V_VARYING);
+                changed = cell.meetWithTypeBottom(fieldLoadType(getFieldInst));
             }
             case Instruction.ArgInstruction argInst -> {
                 var cell = valueLattice.get(argInst.def());
-                changed = cell.setKind(V_VARYING);
+                changed = cell.meetWithTypeBottom(argInst.def().type);
             }
-            case Instruction.Phi phiInst -> {
-                changed = visitPhi(block, phiInst);
-            }
+            case Instruction.Phi phiInst -> changed = visitPhi(block, phiInst);
             default -> throw new IllegalStateException("Unexpected value: " + instruction);
         }
         return changed;
@@ -448,7 +499,7 @@ public class SparseConditionalConstantPropagation {
 
     private boolean visitPhi(BasicBlock block, Instruction.Phi phiInst) {
         LatticeElement oldValue = valueLattice.get(phiInst.value());
-        LatticeElement newValue = new LatticeElement(V_UNDEFINED, 0);
+        LatticeElement newValue = new LatticeElement(F_TOP);
         for (int j = 0; j < block.predecessors.size(); j++) {
             BasicBlock pred = block.predecessors.get(j);
             // We ignore non-executable edges
@@ -457,8 +508,8 @@ public class SparseConditionalConstantPropagation {
                     LatticeElement varValue = valueLattice.get(phiInst.inputAsRegister(j));
                     newValue.meet(varValue);
                 }
-                else if (phiInst.input(j) instanceof Operand.ConstantOperand constantOperand) {
-                    newValue.meet(constantOperand.value);
+                else if (isConstantOperand(phiInst.input(j))) {
+                    newValue.meet(factFromOperand(phiInst.input(j)));
                 }
             }
         }
@@ -480,79 +531,196 @@ public class SparseConditionalConstantPropagation {
         return false;
     }
 
-    private static boolean evalLogical(LatticeElement cell, LatticeElement left, LatticeElement right, String binOp) {
-        boolean changed = false;
-        if (left.kind == V_CONSTANT && right.kind == V_CONSTANT) {
-            long leftValue = left.value;
-            long rightValue = right.value;
-            long result;
-            switch (binOp) {
-                case "==":
-                    result = leftValue == rightValue ? 1 : 0;
-                    break;
-                case "!=":
-                    result = leftValue != rightValue ? 1 : 0;
-                    break;
-                case "<":
-                    result = leftValue < rightValue ? 1 : 0;
-                    break;
-                case ">":
-                    result = leftValue > rightValue ? 1 : 0;
-                    break;
-                case "<=":
-                    result = leftValue <= rightValue ? 1 : 0;
-                    break;
-                case ">=":
-                    result = leftValue >= rightValue ? 1 : 0;
-                    break;
-                default:
-                    throw new IllegalStateException();
-            }
-            changed = cell.meet(result);
-        } else if (left.kind == V_VARYING || right.kind == V_VARYING) {
-            // We could constrain the result here to the set [0-1]
-            // but we don't track ranges or sets of values
-            changed = cell.setKind(V_VARYING);
-        }
-        return changed;
+    private LatticeElement factFromOperandOrRegister(Operand operand) {
+        if (operand instanceof Operand.RegisterOperand registerOperand)
+            return valueLattice.get(registerOperand.reg);
+        if (isConstantOperand(operand))
+            return factFromOperand(operand);
+        return null;
     }
 
-    private static boolean evalArith(LatticeElement cell, LatticeElement left, LatticeElement right, String binOp) {
-        boolean changed = false;
-        if (left.kind == V_CONSTANT && right.kind == V_CONSTANT) {
-            long leftValue = left.value;
-            long rightValue = right.value;
-            long result;
-            switch (binOp) {
-                case "+":
-                    result = leftValue + rightValue;
-                    break;
-                case "-":
-                    result = leftValue - rightValue;
-                    break;
-                case "/":
+    private static boolean isConstantOperand(Operand operand) {
+        return operand instanceof Operand.IntConstantOperand ||
+                operand instanceof Operand.FloatConstantOperand ||
+                operand instanceof Operand.NullConstantOperand;
+    }
+
+    private static LatticeElement factFromOperand(Operand operand) {
+        if (operand instanceof Operand.IntConstantOperand constantOperand)
+            return new LatticeElement(constantOperand.value);
+        if (operand instanceof Operand.FloatConstantOperand constantOperand)
+            return new LatticeElement(constantOperand.value);
+        if (operand instanceof Operand.NullConstantOperand)
+            return new LatticeElement(F_REF_NULL);
+        throw new IllegalStateException("Unexpected constant operand: " + operand);
+    }
+
+    private static LatticeElement factTopFromType(EZType type) {
+        if (type instanceof EZType.EZTypeInteger)
+            return new LatticeElement(F_INT_TOP);
+        if (type instanceof EZType.EZTypeFloat)
+            return new LatticeElement(F_FLT_TOP);
+        if (isReferenceType(type))
+            return new LatticeElement(F_REF_TOP);
+        return new LatticeElement(F_TOP);
+    }
+
+    private static LatticeElement factBottomFromType(EZType type) {
+        if (type instanceof EZType.EZTypeInteger)
+            return new LatticeElement(F_INT_BOTTOM);
+        if (type instanceof EZType.EZTypeFloat)
+            return new LatticeElement(F_FLT_BOTTOM);
+        if (type instanceof EZType.EZTypeNull)
+            return new LatticeElement(F_REF_NULL);
+        if (isReferenceType(type))
+            return new LatticeElement(F_REF_BOTTOM);
+        return new LatticeElement(F_BOTTOM);
+    }
+
+    private static boolean isReferenceType(EZType type) {
+        return type instanceof EZType.EZTypeNullable ||
+                type instanceof EZType.EZTypeArray ||
+                type instanceof EZType.EZTypeStruct ||
+                type instanceof EZType.EZTypeNull;
+    }
+
+    private static EZType arrayLoadType(Instruction.ArrayLoad arrayLoadInst) {
+        EZType type = aggregateBaseType(operandType(arrayLoadInst.arrayOperand()));
+        if (type instanceof EZType.EZTypeArray arrayType)
+            return arrayType.getElementType();
+        return arrayLoadInst.destOperand().reg.type;
+    }
+
+    private static EZType fieldLoadType(Instruction.GetField getFieldInst) {
+        EZType type = aggregateBaseType(operandType(getFieldInst.structOperand()));
+        if (type instanceof EZType.EZTypeStruct structType) {
+            EZType fieldType = structType.getField(getFieldInst.fieldName);
+            if (fieldType != null)
+                return fieldType;
+        }
+        return getFieldInst.destOperand().reg.type;
+    }
+
+    private static EZType aggregateBaseType(EZType type) {
+        if (type instanceof EZType.EZTypeNullable nullable)
+            return nullable.baseType;
+        return type;
+    }
+
+    private static EZType operandType(Operand operand) {
+        if (operand instanceof Operand.RegisterOperand registerOperand)
+            return registerOperand.reg.type;
+        return operand.type;
+    }
+
+    private static boolean evalUnary(LatticeElement cell, LatticeElement input, String unOp, EZType resultType) {
+        if (input.isIntegerConstant()) {
+            long value = input.kind == F_INT_ZERO ? 0 : input.intValue;
+            if (unOp.equals("-"))
+                return cell.meet(new LatticeElement(-value));
+            if (unOp.equals("!"))
+                return cell.meet(new LatticeElement(value == 0 ? 1L : 0L));
+        }
+        if (input.isFloatConstant() && unOp.equals("-"))
+            return cell.meet(new LatticeElement(-input.floatValue));
+        if (input.kind == F_TOP || input.kind == F_INT_TOP || input.kind == F_FLT_TOP)
+            return false;
+        return cell.meetWithTypeBottom(resultType);
+    }
+
+    private static boolean evalLogical(LatticeElement cell, LatticeElement left, LatticeElement right, String binOp, EZType resultType) {
+        if (left.isIntegerConstant() && right.isIntegerConstant()) {
+            long leftValue = left.kind == F_INT_ZERO ? 0 : left.intValue;
+            long rightValue = right.kind == F_INT_ZERO ? 0 : right.intValue;
+            long result = switch (binOp) {
+                case "==" -> leftValue == rightValue ? 1 : 0;
+                case "!=" -> leftValue != rightValue ? 1 : 0;
+                case "<" -> leftValue < rightValue ? 1 : 0;
+                case ">" -> leftValue > rightValue ? 1 : 0;
+                case "<=" -> leftValue <= rightValue ? 1 : 0;
+                case ">=" -> leftValue >= rightValue ? 1 : 0;
+                default -> throw new IllegalStateException();
+            };
+            return cell.meet(new LatticeElement(result));
+        }
+        if (left.isFloatConstant() && right.isFloatConstant()) {
+            double leftValue = left.floatValue;
+            double rightValue = right.floatValue;
+            long result = switch (binOp) {
+                case "==" -> leftValue == rightValue ? 1 : 0;
+                case "!=" -> leftValue != rightValue ? 1 : 0;
+                case "<" -> leftValue < rightValue ? 1 : 0;
+                case ">" -> leftValue > rightValue ? 1 : 0;
+                case "<=" -> leftValue <= rightValue ? 1 : 0;
+                case ">=" -> leftValue >= rightValue ? 1 : 0;
+                default -> throw new IllegalStateException();
+            };
+            return cell.meet(new LatticeElement(result));
+        }
+        // Reference equality/inequality where both operands are definite
+        // (null or not-null). Two distinct not-null pointers are undecidable,
+        // so only fold when at least one side is known null.
+        if (left.isDefiniteReference() && right.isDefiniteReference() &&
+                (left.isNullConstant() || right.isNullConstant())) {
+            boolean equal = left.isNullConstant() && right.isNullConstant();
+            long result = switch (binOp) {
+                case "==" -> equal ? 1 : 0;
+                case "!=" -> equal ? 0 : 1;
+                default -> throw new IllegalStateException();
+            };
+            return cell.meet(new LatticeElement(result));
+        }
+        if (left.kind == F_TOP || right.kind == F_TOP ||
+                left.kind == F_INT_TOP || right.kind == F_INT_TOP ||
+                left.kind == F_FLT_TOP || right.kind == F_FLT_TOP ||
+                left.kind == F_REF_TOP || right.kind == F_REF_TOP)
+            return false;
+        return cell.meetWithTypeBottom(resultType);
+    }
+
+    private static boolean evalArith(LatticeElement cell, LatticeElement left, LatticeElement right, String binOp, EZType resultType) {
+        if (left.isIntegerConstant() && right.isIntegerConstant()) {
+            long leftValue = left.kind == F_INT_ZERO ? 0 : left.intValue;
+            long rightValue = right.kind == F_INT_ZERO ? 0 : right.intValue;
+            long result = switch (binOp) {
+                case "+" -> leftValue + rightValue;
+                case "-" -> leftValue - rightValue;
+                case "/" -> {
                     if (rightValue == 0) throw new CompilerException("Division by zero");
-                    result = leftValue / rightValue;
-                    break;
-                case "*":
-                    result = leftValue * rightValue;
-                    break;
-                case "%":
-                    result = leftValue % rightValue;
-                    break;
-                default:
-                    throw new IllegalStateException();
-            }
-            changed = cell.meet(result);
-        } else if (binOp.equals("*") && ((left.kind == V_CONSTANT && left.value == 0) || (right.kind == V_CONSTANT && right.value == 0))) {
-            // multiplication with 0 yields 0
-            changed = cell.meet(0);
-        } else if (left.kind == V_VARYING || right.kind == V_VARYING) {
-            changed = cell.setKind(V_VARYING);
+                    yield leftValue / rightValue;
+                }
+                case "*" -> leftValue * rightValue;
+                case "%" -> {
+                    if (rightValue == 0) throw new CompilerException("Division by zero");
+                    yield leftValue % rightValue;
+                }
+                default -> throw new IllegalStateException();
+            };
+            return cell.meet(new LatticeElement(result));
         }
-        return changed;
+        if (left.isFloatConstant() && right.isFloatConstant()) {
+            double leftValue = left.floatValue;
+            double rightValue = right.floatValue;
+            double result = switch (binOp) {
+                case "+" -> leftValue + rightValue;
+                case "-" -> leftValue - rightValue;
+                case "/" -> leftValue / rightValue;
+                case "*" -> leftValue * rightValue;
+                default -> throw new IllegalStateException();
+            };
+            return cell.meet(new LatticeElement(result));
+        }
+        if (binOp.equals("*") &&
+                ((left.isIntegerConstant() && left.kind == F_INT_ZERO) ||
+                 (right.isIntegerConstant() && right.kind == F_INT_ZERO))) {
+            return cell.meet(new LatticeElement(0L));
+        }
+        if (left.kind == F_TOP || right.kind == F_TOP ||
+                left.kind == F_INT_TOP || right.kind == F_INT_TOP ||
+                left.kind == F_FLT_TOP || right.kind == F_FLT_TOP)
+            return false;
+        return cell.meetWithTypeBottom(resultType);
     }
-
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -583,8 +751,7 @@ public class SparseConditionalConstantPropagation {
         LatticeElement get(Register reg) {
             var cell = valueLattice.get(reg);
             if (cell == null) {
-                // Initial value is UNDEFINED/TOP
-                cell = new LatticeElement(V_UNDEFINED, 0);
+                cell = factTopFromType(reg.type);
                 valueLattice.put(reg, cell);
             }
             return cell;

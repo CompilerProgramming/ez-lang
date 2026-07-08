@@ -411,7 +411,7 @@ public class Parser {
                 }
             }
             default -> {
-                error(currentToken, "syntax error, expected nested expr, integer value or variable");
+                error(currentToken, "syntax error, expected nested expr, numeric value or variable");
                 return null;
             }
         }

@@ -480,4 +480,53 @@ public class TestSemaAssignTypes {
 """;
         analyze(src, "foo", "func foo()");
     }
+    @Test
+    public void testFloatArithmeticAndArray() {
+        String src = """
+    func foo(a: Float, b: Float)->Float
+    {
+       var f = new [Float] {1.5, 2.5}
+       f[0] = a + b
+       return f[0]
+    }
+""";
+        analyze(src, "foo", "func foo(a: Float,b: Float)->Float");
+    }
+
+    @Test
+    public void testFloatComparisonReturnsInt() {
+        String src = """
+    func foo(a: Float, b: Float)->Int
+    {
+       return a < b
+    }
+""";
+        analyze(src, "foo", "func foo(a: Float,b: Float)->Int");
+    }
+    @Test(expected = CompilerException.class)
+    public void testFloatIfConditionRejected() {
+        String src = """
+    func foo()->Int
+    {
+       if (1.0)
+          return 1
+       return 0
+    }
+""";
+        analyze(src, "foo", "func foo()->Int");
+    }
+
+    @Test(expected = CompilerException.class)
+    public void testFloatWhileConditionRejected() {
+        String src = """
+    func foo()->Int
+    {
+       while (1.0) {
+          return 1
+       }
+       return 0
+    }
+""";
+        analyze(src, "foo", "func foo()->Int");
+    }
 }

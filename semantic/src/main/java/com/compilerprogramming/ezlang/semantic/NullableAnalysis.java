@@ -47,16 +47,20 @@ public class NullableAnalysis {
                 var type = varSymbol.type;
                 LatticeElement elem;
                 if (varSymbol instanceof Symbol.ParameterSymbol) {
-                    if (type.isPrimitive())
+                    if (type instanceof EZType.EZTypeInteger)
                         elem = new LatticeElement(F_INT_BOTTOM);
+                    else if (type instanceof EZType.EZTypeFloat)
+                        elem = new LatticeElement(F_FLT_BOTTOM);
                     else if (type instanceof EZType.EZTypeNullable)
                         elem = new LatticeElement(F_REF_BOTTOM);
                     else
                         elem = new LatticeElement(F_REF_NOT_NULL);
                 }
                 else {
-                    elem = type.isPrimitive()
+                    elem = type instanceof EZType.EZTypeInteger
                             ? new LatticeElement(F_INT_TOP)
+                            : type instanceof EZType.EZTypeFloat
+                            ? new LatticeElement(F_FLT_TOP)
                             : new LatticeElement(F_REF_TOP);
                 }
                 latticeElements.add(elem);
@@ -66,16 +70,6 @@ public class NullableAnalysis {
             setVirtualRegisters(childScope);
         }
     }
-
-    //                 TOP
-    //              /     \
-    //         REF_TOP   INT_TOP
-    //         /     \    /  |   \
-    //      NULL NOT_NULL ZERO NZC NZV
-    //         \     /     \  |  /
-    //        REF_BOTTOM   INT_BOTTOM
-    //              \       /
-    //               BOTTOM
 
     static final byte F_TOP = 0;             // no usable fact yet
 
@@ -90,12 +84,17 @@ public class NullableAnalysis {
     static final byte F_INT_NONZERO_VARYING = 8;
     static final byte F_INT_BOTTOM = 9;      // may be zero or non-zero
 
-    static final byte F_BOTTOM = 10;         // impossible / contradiction
+    static final byte F_FLT_TOP = 10;        // known float type, value unknown
+    static final byte F_FLT_CONST = 11;
+    static final byte F_FLT_BOTTOM = 12;     // non-const float
+
+    static final byte F_BOTTOM = 13;         // impossible / contradiction
 
     // Associated with each register
     static final class LatticeElement {
         public byte kind;
         private long intValue;
+        private double floatValue;
 
         public LatticeElement(byte kind) {
             this.kind = kind;
@@ -108,8 +107,14 @@ public class NullableAnalysis {
             kind = F_INT_TOP;
             setIntValue(value);
         }
+        public LatticeElement(double value) {
+            kind = F_FLT_TOP;
+            setFloatValue(value);
+        }
         LatticeElement copy() {
-            return new LatticeElement(kind, intValue);
+            LatticeElement copy = new LatticeElement(kind, intValue);
+            copy.floatValue = floatValue;
+            return copy;
         }
 
         boolean isTrue() {
@@ -120,6 +125,23 @@ public class NullableAnalysis {
         }
         boolean isIntegerConstant() {
             return kind == F_INT_ZERO || kind == F_INT_NONZERO_CONST;
+        }
+        boolean isFloatConstant() {
+            return kind == F_FLT_CONST;
+        }
+        boolean setFloatValue(double value) {
+            byte prevKind = kind;
+            if (kind == F_FLT_TOP) {
+                this.floatValue = value;
+                this.kind = F_FLT_CONST;
+            }
+            else if (kind == F_FLT_CONST && Double.compare(value, floatValue) != 0) {
+                this.kind = F_FLT_BOTTOM;
+            }
+            else if (!isFloat()) {
+                throw new CompilerException("Cannot assign float value to non-float type");
+            }
+            return kind != prevKind;
         }
         boolean setIntValue(long value) {
             byte prevKind = kind;
@@ -161,6 +183,10 @@ public class NullableAnalysis {
                         intValue != other.intValue) {
                     kind = F_INT_NONZERO_VARYING;
                 }
+                else if (kind == F_FLT_CONST &&
+                        Double.compare(floatValue, other.floatValue) != 0) {
+                    kind = F_FLT_BOTTOM;
+                }
                 return kind != old;
             }
 
@@ -173,6 +199,12 @@ public class NullableAnalysis {
             // integer lattice
             if (isInteger(kind) && isInteger(other.kind)) {
                 meetInteger(other);
+                return kind != old;
+            }
+
+            // float lattice
+            if (isFloat(kind) && isFloat(other.kind)) {
+                meetFloat(other);
                 return kind != old;
             }
 
@@ -257,13 +289,30 @@ public class NullableAnalysis {
             return kind >= F_REF_TOP && kind <= F_REF_BOTTOM;
         }
 
+        private void meetFloat(LatticeElement other) {
+            if (kind == F_FLT_TOP) {
+                copyFrom(other);
+                return;
+            }
+            if (other.kind == F_FLT_TOP)
+                return;
+            if (kind == F_FLT_CONST &&
+                    (other.kind == F_FLT_BOTTOM ||
+                     (other.kind == F_FLT_CONST && Double.compare(floatValue, other.floatValue) != 0))) {
+                kind = F_FLT_BOTTOM;
+            }
+        }
         private static boolean isInteger(byte kind) {
             return kind >= F_INT_TOP && kind <= F_INT_BOTTOM;
+        }
+        private static boolean isFloat(byte kind) {
+            return kind >= F_FLT_TOP && kind <= F_FLT_BOTTOM;
         }
         void copyFrom(LatticeElement other) {
             LatticeElement copy = other.copy();
             this.kind = copy.kind;
             this.intValue = copy.intValue;
+            this.floatValue = copy.floatValue;
         }
         boolean isTop() {
             return kind == F_TOP;
@@ -279,6 +328,10 @@ public class NullableAnalysis {
 
         boolean isInteger() {
             return isInteger(kind);
+        }
+
+        boolean isFloat() {
+            return isFloat(kind);
         }
 
         boolean isNull() {
@@ -315,7 +368,11 @@ public class NullableAnalysis {
                 case F_INT_ZERO -> "0";
                 case F_INT_NONZERO_CONST -> Long.toString(intValue);
                 case F_INT_NONZERO_VARYING -> "non-zero";
-                case F_INT_BOTTOM -> "int?";
+                case F_INT_BOTTOM -> "int*";
+
+                case F_FLT_TOP -> "float";
+                case F_FLT_CONST -> Double.toString(floatValue);
+                case F_FLT_BOTTOM -> "float*";
 
                 case F_BOTTOM -> "⊥";
 
@@ -327,12 +384,12 @@ public class NullableAnalysis {
         public boolean equals(Object o) {
             if (o == null || getClass() != o.getClass()) return false;
             LatticeElement that = (LatticeElement) o;
-            return kind == that.kind && intValue == that.intValue;
+            return kind == that.kind && intValue == that.intValue && Double.compare(floatValue, that.floatValue) == 0;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(kind, intValue);
+            return Objects.hash(kind, intValue, floatValue);
         }
     }
     static final class Lattice {
@@ -451,7 +508,11 @@ public class NullableAnalysis {
                 return new LatticeElement(F_REF_NULL);
             }
             if (lit.value.kind == Token.Kind.NUM) {
-                return new LatticeElement(Long.parseLong(lit.value.str));
+                if (lit.type instanceof EZType.EZTypeInteger)
+                    return new LatticeElement(lit.value.num.longValue());
+                if (lit.type instanceof EZType.EZTypeFloat)
+                    return new LatticeElement(lit.value.num.doubleValue());
+                return factFromType(lit.type);
             }
         }
 
@@ -463,7 +524,11 @@ public class NullableAnalysis {
                     return new LatticeElement(-v.intValue);
                 if (v.isInteger())
                     return new LatticeElement(F_INT_BOTTOM);
-                throw new CompilerException("Cannot apply - to non integer");
+                if (v.isFloatConstant())
+                    return new LatticeElement(-v.floatValue);
+                if (v.isFloat())
+                    return new LatticeElement(F_FLT_BOTTOM);
+                throw new CompilerException("Cannot apply - to non numeric value");
             }
 
             if (un.op.str.equals("!")) {
@@ -499,11 +564,13 @@ public class NullableAnalysis {
                         if (b.kind == F_INT_ZERO)
                             throw new CompilerException("Division by zero");
                         value = a.intValue / b.intValue;
+                        isArith = true;
                     }
                     case "%"  -> {
                         if (b.kind == F_INT_ZERO)
                             throw new CompilerException("Division by zero");
                         value = a.intValue % b.intValue;
+                        isArith = true;
                     }
 
                     case "==" -> {
@@ -543,6 +610,41 @@ public class NullableAnalysis {
                 }
                 return result;
             }
+            if (a.isFloatConstant() && b.isFloatConstant()) {
+                double floatValue = 0.0;
+                long intValue = 0;
+                boolean isArith = false;
+                switch (bin.op.str) {
+                    case "+" -> {
+                        floatValue = a.floatValue + b.floatValue;
+                        isArith = true;
+                    }
+                    case "-" -> {
+                        floatValue = a.floatValue - b.floatValue;
+                        isArith = true;
+                    }
+                    case "*" -> {
+                        floatValue = a.floatValue * b.floatValue;
+                        isArith = true;
+                    }
+                    case "/" -> {
+                        floatValue = a.floatValue / b.floatValue;
+                        isArith = true;
+                    }
+                    case "==" -> intValue = a.floatValue == b.floatValue ? 1 : 0;
+                    case "!=" -> intValue = a.floatValue != b.floatValue ? 1 : 0;
+                    case "<" -> intValue = a.floatValue < b.floatValue ? 1 : 0;
+                    case "<=" -> intValue = a.floatValue <= b.floatValue ? 1 : 0;
+                    case ">" -> intValue = a.floatValue > b.floatValue ? 1 : 0;
+                    case ">=" -> intValue = a.floatValue >= b.floatValue ? 1 : 0;
+                    default -> throw new CompilerException("Unknown binary operator " + bin.op.str);
+                }
+                if (isArith)
+                    return new LatticeElement(floatValue);
+                return intValue == 1
+                        ? new LatticeElement(F_INT_NONZERO_CONST, 1)
+                        : new LatticeElement(F_INT_ZERO);
+            }
             return factFromType(bin.type);
         }
 
@@ -558,8 +660,10 @@ public class NullableAnalysis {
             else if (type instanceof EZType.EZTypeArray ||
                      type instanceof EZType.EZTypeStruct)
                 return new LatticeElement(F_REF_NOT_NULL);
-            else if (type.isPrimitive())
+            else if (type instanceof EZType.EZTypeInteger)
                 return new LatticeElement(F_INT_BOTTOM);
+            else if (type instanceof EZType.EZTypeFloat)
+                return new LatticeElement(F_FLT_BOTTOM);
         }
         return new LatticeElement(F_BOTTOM);
     }
@@ -616,9 +720,15 @@ public class NullableAnalysis {
     }
 
     private void checkAssignment(EZType type, LatticeElement lattice) {
-        if (type.isPrimitive()) {
+        if (type instanceof EZType.EZTypeInteger) {
             if (!lattice.isInteger())
-                throw new CompilerException("Cannot assign reference/null to int");
+                throw new CompilerException("Cannot assign non-int value to int");
+            return;
+        }
+
+        if (type instanceof EZType.EZTypeFloat) {
+            if (!lattice.isFloat())
+                throw new CompilerException("Cannot assign non-float value to float");
             return;
         }
 

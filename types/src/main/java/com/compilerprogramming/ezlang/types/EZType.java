@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Currently, we support Int, Struct, and Array of Int/Struct.
+ * Currently, we support Int, Float, Struct, and Array of Int/Float/Struct.
  * Arrays and Structs are reference types.
  */
 public abstract class EZType {
@@ -17,10 +17,11 @@ public abstract class EZType {
     static final byte TUNKNOWN = 1;
     static final byte TNULL = 2;
     static final byte TINT = 3;      // Int, Bool
-    static final byte TNULLABLE = 4;   // Null, or not null ptr
-    static final byte TFUNC = 5;     // Function types
-    static final byte TSTRUCT = 6;
-    static final byte TARRAY = 7;
+    static final byte TFLOAT = 4;    // Float
+    static final byte TNULLABLE = 5; // Null, or not null ptr
+    static final byte TFUNC = 6;     // Function types
+    static final byte TSTRUCT = 7;
+    static final byte TARRAY = 8;
 
     public final byte tclass;    // type class
     public final String name;      // type name, always unique
@@ -99,6 +100,16 @@ public abstract class EZType {
 
         public EZTypeInteger() {
             super (TINT, "Int");
+        }
+        @Override
+        public boolean isPrimitive() {
+            return true;
+        }
+    }
+
+    public static class EZTypeFloat extends EZType {
+        public EZTypeFloat() {
+            super(TFLOAT, "Float");
         }
         @Override
         public boolean isPrimitive() {

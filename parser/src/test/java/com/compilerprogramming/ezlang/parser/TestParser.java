@@ -33,6 +33,13 @@ func bar() -> Test {
     var v = new Test { intArray = new [Tree] {} }
     return v
 }
+func floatAdd(a: Float, b: Float)->Float {
+    return a+b
+}
+func floatArrayCreate()->[Float] {
+    var array = new [Float] {len=10,1.0,2.0,3.0}
+    return array
+}
 func main() {
     var m = 42
     var t: Tree

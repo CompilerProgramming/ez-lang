@@ -118,7 +118,7 @@ public abstract class Instruction {
     /**
      * Replaces all uses of given register with the constant operand
      */
-    public void replaceUseWithConstant(Register register, Operand.ConstantOperand constantOperand) {
+    public void replaceUseWithConstant(Register register, Operand constantOperand) {
         for (int i = 0; i < uses.length; i++) {
             Operand operand = uses[i];
             if (operand != null && operand instanceof Operand.RegisterOperand registerOperand && registerOperand.reg.id == register.id) {

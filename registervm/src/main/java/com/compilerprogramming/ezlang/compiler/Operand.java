@@ -6,9 +6,9 @@ public class Operand {
 
     EZType type;
 
-    public static class ConstantOperand extends Operand {
+    public static class IntConstantOperand extends Operand {
         public final long value;
-        public ConstantOperand(long value, EZType type) {
+        public IntConstantOperand(long value, EZType type) {
             this.value = value;
             this.type = type;
         }
@@ -18,6 +18,17 @@ public class Operand {
         }
     }
 
+    public static class FloatConstantOperand extends Operand {
+        public final double value;
+        public FloatConstantOperand(double value, EZType type) {
+            this.value = value;
+            this.type = type;
+        }
+        @Override
+        public String toString() {
+            return String.valueOf(value);
+        }
+    }
     public static class NullConstantOperand extends Operand {
         public NullConstantOperand(EZType type) {
             this.type = type;
