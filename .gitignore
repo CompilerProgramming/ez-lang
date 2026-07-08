@@ -26,3 +26,6 @@ replay_pid*
 .idea
 
 target
+
+*.o
+.run
