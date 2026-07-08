@@ -2,8 +2,11 @@ package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import com.compilerprogramming.ezlang.types.EZType;
+import com.compilerprogramming.ezlang.types.LatticeElement;
 
 import java.util.*;
+
+import static com.compilerprogramming.ezlang.types.LatticeElement.*;
 
 /**
  * Implementation of Sparse Conditional Constant Propagation based on descriptions
@@ -203,7 +206,7 @@ public class SparseConditionalConstantPropagation {
         for (var register: valueLattice.getRegisters()) {
             var latticeElement = valueLattice.get(register);
             if (latticeElement.isReplaceableConstant()) {
-                var constant = latticeElement.asOperand(register.type);
+                var constant = asOperand(latticeElement, register.type);
                 var defUseChain = this.ssaEdges.get(register);
                 if (defUseChain == null)
                     continue;
@@ -221,149 +224,6 @@ public class SparseConditionalConstantPropagation {
         }
     }
 
-    static final byte F_TOP = 0;             // no usable fact yet
-
-    static final byte F_REF_TOP = 1;         // known reference type, value unknown
-    static final byte F_REF_NOT_NULL = 2;
-    static final byte F_REF_NULL = 3;
-    static final byte F_REF_BOTTOM = 4;      // maybe null
-
-    static final byte F_INT_TOP = 5;         // known int type, value unknown
-    static final byte F_INT_ZERO = 6;
-    static final byte F_INT_NONZERO_CONST = 7;
-    static final byte F_INT_NONZERO_VARYING = 8;
-    static final byte F_INT_BOTTOM = 9;      // may be zero or non-zero
-
-    static final byte F_FLT_TOP = 10;        // known float type, value unknown
-    static final byte F_FLT_CONST = 11;
-    static final byte F_FLT_BOTTOM = 12;     // non-const float
-
-    static final byte F_BOTTOM = 13;         // impossible / contradiction
-
-    // Associated with each register
-    static final class LatticeElement {
-        private byte kind;
-        private long intValue;
-        private double floatValue;
-
-        LatticeElement(byte kind) { this.kind = kind; }
-        LatticeElement(byte kind, long value) { this.kind = kind; this.intValue = value; }
-        LatticeElement(long value) { kind = F_INT_TOP; setIntValue(value); }
-        LatticeElement(double value) { kind = F_FLT_TOP; setFloatValue(value); }
-        LatticeElement copy() { var copy = new LatticeElement(kind, intValue); copy.floatValue = floatValue; return copy; }
-        void copyFrom(LatticeElement other) { kind = other.kind; intValue = other.intValue; floatValue = other.floatValue; }
-
-        boolean isTrue() { return kind == F_INT_NONZERO_CONST || kind == F_INT_NONZERO_VARYING; }
-        boolean isFalse() { return kind == F_INT_ZERO; }
-        boolean isIntegerConstant() { return kind == F_INT_ZERO || kind == F_INT_NONZERO_CONST; }
-        boolean isFloatConstant() { return kind == F_FLT_CONST; }
-        boolean isNullConstant() { return kind == F_REF_NULL; }
-        boolean isDefiniteReference() { return kind == F_REF_NULL || kind == F_REF_NOT_NULL; }
-        boolean isReplaceableConstant() { return isIntegerConstant() || isFloatConstant() || isNullConstant(); }
-
-        boolean setIntValue(long value) {
-            byte old = kind;
-            if (kind == F_TOP || kind == F_INT_TOP) { intValue = value; kind = value == 0 ? F_INT_ZERO : F_INT_NONZERO_CONST; }
-            else if (kind == F_INT_ZERO && value != 0) kind = F_INT_BOTTOM;
-            else if (kind == F_INT_NONZERO_CONST && (value == 0 || value != intValue)) kind = F_INT_BOTTOM;
-            else if (!isInteger()) kind = F_BOTTOM;
-            return kind != old;
-        }
-        boolean setFloatValue(double value) {
-            byte old = kind;
-            if (kind == F_TOP || kind == F_FLT_TOP) { floatValue = value; kind = F_FLT_CONST; }
-            else if (kind == F_FLT_CONST && Double.compare(value, floatValue) != 0) kind = F_FLT_BOTTOM;
-            else if (!isFloat()) kind = F_BOTTOM;
-            return kind != old;
-        }
-        boolean meetWithTypeBottom(EZType type) { return meet(factBottomFromType(type)); }
-
-        boolean meet(LatticeElement other) {
-            byte old = kind;
-            long oldInt = intValue;
-            double oldFloat = floatValue;
-            if (kind == F_TOP) { copyFrom(other); return changed(old, oldInt, oldFloat); }
-            if (kind == F_BOTTOM || other.kind == F_TOP) return false;
-            if (other.kind == F_BOTTOM) { kind = F_BOTTOM; return changed(old, oldInt, oldFloat); }
-            if (kind == other.kind) {
-                if (kind == F_INT_NONZERO_CONST && intValue != other.intValue) kind = F_INT_NONZERO_VARYING;
-                else if (kind == F_FLT_CONST && Double.compare(floatValue, other.floatValue) != 0) kind = F_FLT_BOTTOM;
-                return changed(old, oldInt, oldFloat);
-            }
-            if (isReference(kind) && isReference(other.kind)) { kind = meetReference(other); return changed(old, oldInt, oldFloat); }
-            if (isInteger(kind) && isInteger(other.kind)) { meetInteger(other); return changed(old, oldInt, oldFloat); }
-            if (isFloat(kind) && isFloat(other.kind)) { meetFloat(other); return changed(old, oldInt, oldFloat); }
-            kind = F_BOTTOM;
-            return changed(old, oldInt, oldFloat);
-        }
-        private boolean changed(byte oldKind, long oldInt, double oldFloat) { return kind != oldKind || intValue != oldInt || Double.compare(floatValue, oldFloat) != 0; }
-        private byte meetReference(LatticeElement other) {
-            if (kind == F_REF_TOP) return other.kind;
-            if (other.kind == F_REF_TOP) return kind;
-            return switch (kind) {
-                case F_REF_NULL -> other.kind == F_REF_NULL ? F_REF_NULL : F_REF_BOTTOM;
-                case F_REF_NOT_NULL -> other.kind == F_REF_NOT_NULL ? F_REF_NOT_NULL : F_REF_BOTTOM;
-                case F_REF_BOTTOM -> F_REF_BOTTOM;
-                default -> F_BOTTOM;
-            };
-        }
-        private void meetInteger(LatticeElement other) {
-            if (kind == F_INT_TOP) { copyFrom(other); return; }
-            if (other.kind == F_INT_TOP) return;
-            switch (kind) {
-                case F_INT_ZERO -> { if (other.kind != F_INT_ZERO) kind = F_INT_BOTTOM; }
-                case F_INT_NONZERO_CONST -> {
-                    switch (other.kind) {
-                        case F_INT_NONZERO_CONST -> { if (intValue != other.intValue) kind = F_INT_NONZERO_VARYING; }
-                        case F_INT_NONZERO_VARYING -> kind = F_INT_NONZERO_VARYING;
-                        case F_INT_ZERO, F_INT_BOTTOM -> kind = F_INT_BOTTOM;
-                    }
-                }
-                case F_INT_NONZERO_VARYING -> { if (other.kind == F_INT_ZERO || other.kind == F_INT_BOTTOM) kind = F_INT_BOTTOM; }
-                case F_INT_BOTTOM -> { }
-            }
-        }
-        private void meetFloat(LatticeElement other) {
-            if (kind == F_FLT_TOP) { copyFrom(other); return; }
-            if (other.kind == F_FLT_TOP) return;
-            if (kind == F_FLT_CONST && (other.kind == F_FLT_BOTTOM || (other.kind == F_FLT_CONST && Double.compare(floatValue, other.floatValue) != 0)))
-                kind = F_FLT_BOTTOM;
-        }
-        boolean isReference() { return isReference(kind); }
-        boolean isInteger() { return isInteger(kind); }
-        boolean isFloat() { return isFloat(kind); }
-        private static boolean isReference(byte kind) { return kind >= F_REF_TOP && kind <= F_REF_BOTTOM; }
-        private static boolean isInteger(byte kind) { return kind >= F_INT_TOP && kind <= F_INT_BOTTOM; }
-        private static boolean isFloat(byte kind) { return kind >= F_FLT_TOP && kind <= F_FLT_BOTTOM; }
-
-        Operand asOperand(EZType type) {
-            if (kind == F_INT_ZERO) return new Operand.IntConstantOperand(0, type);
-            if (kind == F_INT_NONZERO_CONST) return new Operand.IntConstantOperand(intValue, type);
-            if (kind == F_FLT_CONST) return new Operand.FloatConstantOperand(floatValue, type);
-            if (kind == F_REF_NULL) return new Operand.NullConstantOperand(type);
-            throw new IllegalStateException("Lattice value is not a constant: " + this);
-        }
-        @Override
-        public String toString() {
-            return switch (kind) {
-                case F_TOP -> "T";
-                case F_REF_TOP -> "ref";
-                case F_INT_TOP -> "int";
-                case F_FLT_TOP -> "flt";
-                case F_REF_NOT_NULL -> "not-null";
-                case F_REF_NULL -> "null";
-                case F_REF_BOTTOM -> "maybe-null";
-                case F_INT_BOTTOM -> "int*";
-                case F_FLT_BOTTOM -> "flt*";
-                case F_INT_ZERO -> "0";
-                case F_INT_NONZERO_CONST -> Long.toString(intValue);
-                case F_INT_NONZERO_VARYING -> "non-zero";
-                case F_FLT_CONST -> Double.toString(floatValue);
-                case F_BOTTOM -> "⊥";
-                default -> throw new CompilerException("Unknown lattice kind: " + kind);
-            };
-        }
-    }
     // A CFG edge
     static final class FlowEdge {
         BasicBlock source;
@@ -555,35 +415,13 @@ public class SparseConditionalConstantPropagation {
         throw new IllegalStateException("Unexpected constant operand: " + operand);
     }
 
-    private static LatticeElement factTopFromType(EZType type) {
-        if (type instanceof EZType.EZTypeInteger)
-            return new LatticeElement(F_INT_TOP);
-        if (type instanceof EZType.EZTypeFloat)
-            return new LatticeElement(F_FLT_TOP);
-        if (isReferenceType(type))
-            return new LatticeElement(F_REF_TOP);
-        return new LatticeElement(F_TOP);
+    private static Operand asOperand(LatticeElement element, EZType type) {
+        if (element.kind == F_INT_ZERO) return new Operand.IntConstantOperand(0, type);
+        if (element.kind == F_INT_NONZERO_CONST) return new Operand.IntConstantOperand(element.intValue, type);
+        if (element.kind == F_FLT_CONST) return new Operand.FloatConstantOperand(element.floatValue, type);
+        if (element.kind == F_REF_NULL) return new Operand.NullConstantOperand(type);
+        throw new IllegalStateException("Lattice value is not a constant: " + element);
     }
-
-    private static LatticeElement factBottomFromType(EZType type) {
-        if (type instanceof EZType.EZTypeInteger)
-            return new LatticeElement(F_INT_BOTTOM);
-        if (type instanceof EZType.EZTypeFloat)
-            return new LatticeElement(F_FLT_BOTTOM);
-        if (type instanceof EZType.EZTypeNull)
-            return new LatticeElement(F_REF_NULL);
-        if (isReferenceType(type))
-            return new LatticeElement(F_REF_BOTTOM);
-        return new LatticeElement(F_BOTTOM);
-    }
-
-    private static boolean isReferenceType(EZType type) {
-        return type instanceof EZType.EZTypeNullable ||
-                type instanceof EZType.EZTypeArray ||
-                type instanceof EZType.EZTypeStruct ||
-                type instanceof EZType.EZTypeNull;
-    }
-
     private static EZType arrayLoadType(Instruction.ArrayLoad arrayLoadInst) {
         EZType type = aggregateBaseType(operandType(arrayLoadInst.arrayOperand()));
         if (type instanceof EZType.EZTypeArray arrayType)
