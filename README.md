@@ -9,11 +9,11 @@ The EeZee programming language is designed to allow us to learn various compiler
 The EeZee programming language is a tiny statically typed language with syntax inspired by Swift.
 The language has the following features:
 
-* Integer, Struct and 1-Dimensional Array types
+* Integer, Float, Struct and 1-Dimensional Array types
 * If and While statements
 * Functions
 
-The EeZee language specification is [available](https://compilerprogramming.github.io/ez-lang.html).
+The EeZee language specification is [available](./docs/ez-lang.rst).
 The language is intentionally very simple and is meant to have just enough functionality to experiment with compiler implementation techniques.
 
 ## Modules
@@ -30,6 +30,10 @@ The project is under development and subject to change. At this point in time, w
   targeting an abstract machine. Includes Interpreter to run the abstract machine.
 * [seaofnodes](./seaofnodes/README.md) - WIP compiler that generates Sea of Nodes IR, using SoN backend from [Simple Chapter 21](https://github.com/SeaOfNodes/Simple).
   Generates native code for X86-64, AArch64 and RISC-V.
+
+## Documentation
+
+See [docs](./docs)
 
 ## How can you contribute?
 
