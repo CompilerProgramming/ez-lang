@@ -1,6 +1,11 @@
 package com.compilerprogramming.ezlang.interpreter;
 
 import com.compilerprogramming.ezlang.compiler.Compiler;
+import com.compilerprogramming.ezlang.compiler.CompiledFunction;
+import com.compilerprogramming.ezlang.compiler.Instruction;
+import com.compilerprogramming.ezlang.compiler.Operand;
+import com.compilerprogramming.ezlang.exceptions.InterpreterException;
+import com.compilerprogramming.ezlang.types.Symbol;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -498,4 +503,59 @@ func main()->Int
                 integerValue.value == 1);
     }
 
+    @Test(expected = InterpreterException.class)
+    public void testFloatConstantBranchConditionRejectedByInterpreter() {
+        String src = """
+                func foo()->Int {
+                    if (1)
+                        return 1;
+                    return 0;
+                }
+                """;
+        var compiler = new Compiler();
+        var typeDict = compiler.compileSrc(src);
+        var functionSymbol = (Symbol.FunctionTypeSymbol) typeDict.lookup("foo");
+        var function = (CompiledFunction) functionSymbol.code();
+        for (int i = 0; i < function.entry.instructions.size(); i++) {
+            if (function.entry.instructions.get(i) instanceof Instruction.ConditionalBranch cbr) {
+                function.entry.instructions.set(i, new Instruction.ConditionalBranch(
+                        function.entry,
+                        new Operand.FloatConstantOperand(1.0, typeDict.FLOAT),
+                        cbr.trueBlock,
+                        cbr.falseBlock));
+                break;
+            }
+        }
+        new Interpreter(typeDict).run("foo");
+    }
+    @Test
+    public void testFloatArithmetic() {
+        String src = """
+                func add(a: Float, b: Float)->Float {
+                    return a+b;
+                }
+                func foo()->Float {
+                    return add(1.25,2.5);
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.FloatValue floatValue
+                && Math.abs(floatValue.value - 3.75) < 0.000001);
+    }
+
+    @Test
+    public void testFloatArray() {
+        String src = """
+                func foo()->Float {
+                    var t = new [Float] {1.0,2.25,3.5};
+                    t[1] = t[1] + 1.25;
+                    return t[1];
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.FloatValue floatValue
+                && Math.abs(floatValue.value - 3.5) < 0.000001);
+    }
 }

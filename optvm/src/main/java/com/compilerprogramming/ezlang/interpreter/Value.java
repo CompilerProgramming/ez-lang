@@ -11,6 +11,12 @@ public class Value {
         }
         public final long value;
     }
+    static public class FloatValue extends Value {
+        public FloatValue(double value) {
+            this.value = value;
+        }
+        public final double value;
+    }
     static public class NullValue extends Value {
         public NullValue() {}
     }

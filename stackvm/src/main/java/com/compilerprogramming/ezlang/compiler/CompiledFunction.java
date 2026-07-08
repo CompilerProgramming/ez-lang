@@ -146,6 +146,7 @@ public class CompiledFunction {
         currentBreakTarget = exitBlock;
         currentContinueTarget = loopHead;
         startBlock(loopHead);
+        checkConditionType(whileStmt.condition.type, whileStmt.lineNumber);
         boolean indexed = compileExpr(whileStmt.condition);
         if (indexed)
             codeIndexedLoad();
@@ -157,6 +158,11 @@ public class CompiledFunction {
         startBlock(exitBlock);
         currentContinueTarget = savedContinueTarget;
         currentBreakTarget = savedBreakTarget;
+    }
+
+    private void checkConditionType(EZType conditionType, int lineNumber) {
+        if (!(conditionType instanceof EZType.EZTypeInteger))
+            throw new CompilerException("Condition expression must be Int type", lineNumber);
     }
 
     private boolean isBlockTerminated(BasicBlock block) {
@@ -182,6 +188,7 @@ public class CompiledFunction {
         boolean needElse = ifElseStmt.elseStmt != null;
         BasicBlock elseBlock = needElse ? createBlock() : null;
         BasicBlock exitBlock = createBlock();
+        checkConditionType(ifElseStmt.condition.type, ifElseStmt.lineNumber);
         boolean indexed = compileExpr(ifElseStmt.condition);
         if (indexed)
             codeIndexedLoad();
@@ -278,7 +285,7 @@ public class CompiledFunction {
         boolean indexed = compileExpr(fieldExpr.object);
         if (indexed)
             codeIndexedLoad();
-        code(new Instruction.PushConst(fieldIndex));
+        code(new Instruction.pushIntConstant(fieldIndex));
         return true;
     }
 
@@ -297,7 +304,7 @@ public class CompiledFunction {
             throw new CompilerException("Field " + setFieldExpr.fieldName + " not found in struct " + structType.name, setFieldExpr.lineNumber);
         if (!(setFieldExpr instanceof AST.InitFieldExpr))
             compileExpr(setFieldExpr.object);
-        code(new Instruction.PushConst(fieldIndex));
+        code(new Instruction.pushIntConstant(fieldIndex));
         boolean indexed = compileExpr(setFieldExpr.value);
         if (indexed)
             codeIndexedLoad();
@@ -344,6 +351,8 @@ public class CompiledFunction {
     }
 
     private boolean codeBoolean(AST.BinaryExpr binaryExpr) {
+        checkConditionType(binaryExpr.expr1.type, binaryExpr.lineNumber);
+        checkConditionType(binaryExpr.expr2.type, binaryExpr.lineNumber);
         boolean isAnd = binaryExpr.op.str.equals("&&");
         BasicBlock l1 = createBlock();
         BasicBlock l2 = createBlock();
@@ -363,7 +372,7 @@ public class CompiledFunction {
         jumpTo(l3);
         startBlock(l2);
         // Below we must write to the same temp
-        code(new Instruction.PushConst(isAnd ? 0 : 1));
+        code(new Instruction.pushIntConstant(isAnd ? 0 : 1));
         jumpTo(l3);
         startBlock(l3);
         // leaves result on stack
@@ -384,10 +393,10 @@ public class CompiledFunction {
         if (indexed)
             codeIndexedLoad();
         switch (binOp) {
-            case "+" -> opCode = Instruction.ADD_I;
-            case "-" -> opCode = Instruction.SUB_I;
-            case "*" -> opCode = Instruction.MUL_I;
-            case "/" -> opCode = Instruction.DIV_I;
+            case "+" -> opCode = binaryExpr.type instanceof EZType.EZTypeFloat ? Instruction.ADD_F : Instruction.ADD_I;
+            case "-" -> opCode = binaryExpr.type instanceof EZType.EZTypeFloat ? Instruction.SUB_F : Instruction.SUB_I;
+            case "*" -> opCode = binaryExpr.type instanceof EZType.EZTypeFloat ? Instruction.MUL_F : Instruction.MUL_I;
+            case "/" -> opCode = binaryExpr.type instanceof EZType.EZTypeFloat ? Instruction.DIV_F : Instruction.DIV_I;
             case "%" -> opCode = Instruction.MOD_I;
             case "==" -> opCode = Instruction.EQ;
             case "!=" -> opCode = Instruction.NE;
@@ -407,7 +416,7 @@ public class CompiledFunction {
         if (indexed)
             code(new Instruction.LoadIndexed());
         switch (unaryExpr.op.str) {
-            case "-" -> opCode = Instruction.NEG_I;
+            case "-" -> opCode = unaryExpr.type instanceof EZType.EZTypeFloat ? Instruction.NEG_F : Instruction.NEG_I;
             case "!" -> opCode = Instruction.NOT;
             default -> throw new CompilerException("Invalid binary op", unaryExpr.lineNumber);
         }
@@ -416,7 +425,10 @@ public class CompiledFunction {
     }
 
     private boolean compileConstantExpr(AST.LiteralExpr constantExpr) {
-        code(new Instruction.PushConst(constantExpr.value.num.intValue()));
+        if (constantExpr.type instanceof EZType.EZTypeFloat)
+            code(new Instruction.PushFloatConst(constantExpr.value.num.doubleValue()));
+        else
+            code(new Instruction.pushIntConstant(constantExpr.value.num.intValue()));
         return false;
     }
 

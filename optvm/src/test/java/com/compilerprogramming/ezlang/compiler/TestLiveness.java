@@ -254,7 +254,7 @@ L1:
         Register i = regPool.newReg("i", typeDictionary.INT);
         Register s = regPool.newReg("s", typeDictionary.INT);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(i)));
         BasicBlock b1 = function.createBlock();
         BasicBlock b2 = function.createBlock();
@@ -270,7 +270,7 @@ L1:
         function.currentBlock.addSuccessor(b3);
         function.startBlock(b2);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(0, typeDictionary.INT),
+                new Operand.IntConstantOperand(0, typeDictionary.INT),
                 new Operand.RegisterOperand(s)));
         function.jumpTo(b3);
         function.startBlock(b3);
@@ -283,7 +283,7 @@ L1:
                 "+",
                 new Operand.RegisterOperand(i),
                 new Operand.RegisterOperand(i),
-                new Operand.ConstantOperand(1, typeDictionary.INT)));
+                new Operand.IntConstantOperand(1, typeDictionary.INT)));
         function.code(new Instruction.ConditionalBranch(
                 function.currentBlock,
                 new Operand.RegisterOperand(i),
@@ -587,13 +587,13 @@ L3:
         Register v3_0 = regPool.newReg("v3_0", typeDictionary.INT);
         Register v4_0 = regPool.newReg("v4_0", typeDictionary.INT);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(47, typeDictionary.INT),
+                new Operand.IntConstantOperand(47, typeDictionary.INT),
                 new Operand.RegisterOperand(v0_0)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(42, typeDictionary.INT),
+                new Operand.IntConstantOperand(42, typeDictionary.INT),
                 new Operand.RegisterOperand(v1_0)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(v3_0)));
         BasicBlock b1 = function.createBlock();
         BasicBlock b2 = function.createBlock();
@@ -607,19 +607,19 @@ L3:
         function.currentBlock.addSuccessor(b2);
         function.startBlock(b1);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(v1_1)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(5, typeDictionary.INT),
+                new Operand.IntConstantOperand(5, typeDictionary.INT),
                 new Operand.RegisterOperand(v2_0)));
         function.jumpTo(b3);
 
         function.startBlock(b2);
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(2, typeDictionary.INT),
+                new Operand.IntConstantOperand(2, typeDictionary.INT),
                 new Operand.RegisterOperand(v0_2)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(10, typeDictionary.INT),
+                new Operand.IntConstantOperand(10, typeDictionary.INT),
                 new Operand.RegisterOperand(v2_2)));
         function.jumpTo(b3);
 

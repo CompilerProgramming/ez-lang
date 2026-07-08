@@ -31,7 +31,7 @@ public class Lexer {
         int startPosition = position++;
         while (position < input.length && Character.isDigit(input[position]))
             position++;
-        if (input[position] == '.') {
+        if (position < input.length && input[position] == '.') {
             position++;
             while (position < input.length && Character.isDigit(input[position]))
                 position++;

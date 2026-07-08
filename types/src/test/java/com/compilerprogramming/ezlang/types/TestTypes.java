@@ -51,4 +51,13 @@ public class TestTypes {
         Assert.assertFalse(nullableS1Type.isAssignable(s2Type));
     }
 
+    @Test
+    public void testFloatTypes() {
+        var typeDict = new TypeDictionary();
+        Assert.assertTrue(typeDict.FLOAT.isPrimitive());
+        Assert.assertTrue(typeDict.FLOAT.isAssignable(typeDict.FLOAT));
+        Assert.assertFalse(typeDict.FLOAT.isAssignable(typeDict.INT));
+        var floatArray = typeDict.makeArrayType(typeDict.FLOAT, false);
+        Assert.assertEquals("[Float]", floatArray.name());
+    }
 }

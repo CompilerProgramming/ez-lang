@@ -67,6 +67,17 @@ public class SemaAssignTypes implements ASTVisitor {
             // booleans are int too
             binaryExpr.type = typeDictionary.INT;
         }
+        else if (binaryExpr.expr1.type instanceof EZType.EZTypeFloat &&
+                 binaryExpr.expr2.type instanceof EZType.EZTypeFloat) {
+            if (binaryExpr.op.str.equals("%") ||
+                binaryExpr.op.str.equals("&&") ||
+                binaryExpr.op.str.equals("||"))
+                throw new CompilerException("Binary operator " + binaryExpr.op + " not supported for Float operands", binaryExpr.lineNumber);
+            binaryExpr.type = switch (binaryExpr.op.str) {
+                case "==", "!=", "<=", "<", ">", ">=" -> typeDictionary.INT;
+                default -> typeDictionary.FLOAT;
+            };
+        }
         else if (((binaryExpr.expr1.type instanceof EZType.EZTypeNull &&
                  binaryExpr.expr2.type instanceof EZType.EZTypeNullable) ||
                 (binaryExpr.expr1.type instanceof EZType.EZTypeNullable &&
@@ -88,6 +99,9 @@ public class SemaAssignTypes implements ASTVisitor {
         }
         validType(unaryExpr.expr.type, false, unaryExpr.lineNumber);
         if (unaryExpr.expr.type instanceof EZType.EZTypeInteger) {
+            unaryExpr.type = unaryExpr.expr.type;
+        }
+        else if (unaryExpr.expr.type instanceof EZType.EZTypeFloat && unaryExpr.op.str.equals("-")) {
             unaryExpr.type = unaryExpr.expr.type;
         }
         else {
@@ -166,7 +180,7 @@ public class SemaAssignTypes implements ASTVisitor {
         if (literalExpr.type != null)
             return this;
         if (literalExpr.value.kind == Token.Kind.NUM) {
-            literalExpr.type = typeDictionary.INT;
+            literalExpr.type = literalExpr.value.str.contains(".") ? typeDictionary.FLOAT : typeDictionary.INT;
         }
         else if (literalExpr.value.kind == Token.Kind.IDENT
                  && literalExpr.value.str.equals("null")) {
@@ -323,6 +337,16 @@ public class SemaAssignTypes implements ASTVisitor {
         currentScope = currentScope.parent;
     }
 
+
+    @Override
+    public void exit(AST.IfElseStmt ifElseStmt) {
+        checkConditionType(ifElseStmt.condition.type, ifElseStmt.lineNumber);
+    }
+
+    @Override
+    public void exit(AST.WhileStmt whileStmt) {
+        checkConditionType(whileStmt.condition.type, whileStmt.lineNumber);
+    }
     @Override
     public void exit(AST.AssignStmt assignStmt) {
         validType(assignStmt.nameExpr.type, false, assignStmt.lineNumber);
@@ -343,6 +367,12 @@ public class SemaAssignTypes implements ASTVisitor {
             throw new CompilerException("Null type not allowed", lineNumber);
     }
 
+
+    private void checkConditionType(EZType conditionType, int lineNumber) {
+        validType(conditionType, false, lineNumber);
+        if (!(conditionType instanceof EZType.EZTypeInteger))
+            throw new CompilerException("Condition expression must be Int type", lineNumber);
+    }
     private void checkAssignmentCompatible(EZType var, EZType value, int lineNumber) {
         if (!var.isAssignable(value))
             throw new CompilerException("Value of type " + value + " cannot be assigned to type " + var, lineNumber);

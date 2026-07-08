@@ -28,6 +28,7 @@ typeName
 
 nominalType
     : 'Int'
+    | 'Float'
     | IDENTIFIER ('?')?
     ;
 
@@ -86,7 +87,7 @@ additionExpression
     ;
 
 multiplicationExpression
-    : unaryExpression (('*' | '/' ) unaryExpression)*
+    : unaryExpression (('*' | '/' | '%') unaryExpression)*
     ;
 
 unaryExpression
@@ -116,6 +117,7 @@ fieldExpression
 
 primaryExpression
     : INTEGER_LITERAL
+    | FLOAT_LITERAL
     | IDENTIFIER
     | '(' orExpression ')'
     | 'new' typeName initExpression
@@ -156,7 +158,9 @@ NON_DIGIT
 INTEGER_LITERAL
    : DEC_LITERAL
    ;
-DEC_LITERAL: DEC_DIGIT (DEC_DIGIT | '_')*;
+DEC_LITERAL: DEC_DIGIT+;
+
+FLOAT_LITERAL: DEC_DIGIT+ '.' DEC_DIGIT*;
 
 fragment DEC_DIGIT: [0-9];
 

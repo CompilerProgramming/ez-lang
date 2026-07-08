@@ -1,6 +1,11 @@
 package com.compilerprogramming.ezlang.interpreter;
 
 import com.compilerprogramming.ezlang.compiler.Compiler;
+import com.compilerprogramming.ezlang.compiler.CompiledFunction;
+import com.compilerprogramming.ezlang.compiler.Instruction;
+import com.compilerprogramming.ezlang.compiler.Operand;
+import com.compilerprogramming.ezlang.exceptions.InterpreterException;
+import com.compilerprogramming.ezlang.types.Symbol;
 import com.compilerprogramming.ezlang.compiler.Options;
 import org.junit.Assert;
 import org.junit.Test;
@@ -850,6 +855,172 @@ func main()->Int
 {
     var nums = new [Int]{33, 10, 55, 71, 29, 3};
     var expected = new [Int]{3,10,29,33,55,71}
+    quicksort(nums, 0, 5);
+    return eq(nums,expected,6)
+}
+""";
+        var value = compileAndRun(src, "main");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.IntegerValue integerValue &&
+                integerValue.value == 1);
+    }
+
+    @Test(expected = InterpreterException.class)
+    public void testFloatConstantBranchConditionRejectedByInterpreter() {
+        String src = """
+                func foo()->Int {
+                    if (1)
+                        return 1;
+                    return 0;
+                }
+                """;
+        var compiler = new Compiler();
+        var typeDict = compiler.compileSrc(src, Options.NONE);
+        var functionSymbol = (Symbol.FunctionTypeSymbol) typeDict.lookup("foo");
+        var function = (CompiledFunction) functionSymbol.code();
+        for (int i = 0; i < function.entry.instructions.size(); i++) {
+            if (function.entry.instructions.get(i) instanceof Instruction.ConditionalBranch cbr) {
+                function.entry.instructions.set(i, new Instruction.ConditionalBranch(
+                        function.entry,
+                        new Operand.FloatConstantOperand(1.0, typeDict.FLOAT),
+                        cbr.trueBlock,
+                        cbr.falseBlock));
+                break;
+            }
+        }
+        new Interpreter(typeDict).run("foo");
+    }
+    @Test
+    public void testFloatArithmetic() {
+        String src = """
+                func add(a: Float, b: Float)->Float {
+                    return a+b;
+                }
+                func foo()->Float {
+                    return add(1.25,2.5);
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.FloatValue floatValue
+                && Math.abs(floatValue.value - 3.75) < 0.000001);
+    }
+
+    @Test
+    public void testFloatArray() {
+        String src = """
+                func foo()->Float {
+                    var t = new [Float] {1.0,2.25,3.5};
+                    t[1] = t[1] + 1.25;
+                    return t[1];
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.FloatValue floatValue
+                && Math.abs(floatValue.value - 3.5) < 0.000001);
+    }
+
+    // A float value flows through an if/else phi, so SSA destruction (the
+    // Briggs path under the OPT presets) must copy a float phi operand
+    // correctly. choose(0)=2.5, choose(1)=1.5 -> 4.0.
+    @Test
+    public void testFloatPhiThroughSSADestruction() {
+        String src = """
+                func choose(c: Int)->Float {
+                    var x = 1.5;
+                    if (c == 0)
+                        x = 2.5;
+                    return x;
+                }
+                func foo()->Float {
+                    return choose(0) + choose(1);
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.FloatValue floatValue
+                && Math.abs(floatValue.value - 4.0) < 0.000001);
+    }
+
+    // A null value flows through an if/else phi, so SSA destruction must copy
+    // a null phi operand correctly. choose(0)=null, choose(1)=not-null.
+    @Test
+    public void testNullPhiThroughSSADestruction() {
+        String src = """
+                struct Foo
+                {
+                    var i: Int
+                }
+                func choose(c: Int)->Foo? {
+                    var x: Foo?
+                    x = new Foo{ i = 7 }
+                    if (c == 0)
+                        x = null
+                    return x
+                }
+                func foo()->Int {
+                    return choose(0) == null && choose(1) != null
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.IntegerValue integerValue
+                && integerValue.value == 1);
+    }
+
+    @Test
+    public void testFunction111() {
+        String src = """
+func swap(arr: [Float], i: Int, j: Int) {
+    var tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+}
+
+func partition(arr: [Float], low: Int, high: Int)->Int {
+    var pivot = arr[high];
+    var i = low;
+    var j = low;
+    while (j < high) {
+        if (arr[j] < pivot) {
+            swap(arr, i, j);
+            i = i + 1;
+        }
+        j = j + 1;
+    }
+    swap(arr, i, high);
+    return i;
+}
+
+func quicksort(arr: [Float], low: Int, high: Int) {
+    if (low < high) {
+        var p = partition(arr, low, high);
+        quicksort(arr, low, p - 1);
+        quicksort(arr, p + 1, high);
+    }
+}
+
+func eq(a: [Int], b: [Int], n: Int)->Int
+{
+    var result = 1
+    var i = 0
+    while (i < n)
+    {
+        if (a[i] != b[i])
+        {
+            result = 0
+            break
+        }
+        i = i + 1
+    }
+    return result
+}
+
+func main()->Int
+{
+    var nums = new [Float]{33.4, 10.2, 55.1, 71.9, 29.9, 3.5};
+    var expected = new [Float]{3.5,10.2,29.9,33.4,55.1,71.9}
     quicksort(nums, 0, 5);
     return eq(nums,expected,6)
 }

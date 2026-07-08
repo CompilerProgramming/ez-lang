@@ -637,7 +637,7 @@ L3:
         Register x1 = regPool.newReg("x1", typeDictionary.INT);
         function.code(new Instruction.ArgInstruction(new Operand.LocalRegisterOperand(p, argSymbol)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(1, typeDictionary.INT),
+                new Operand.IntConstantOperand(1, typeDictionary.INT),
                 new Operand.RegisterOperand(x1)));
         BasicBlock B2 = function.createBlock();
         function.startBlock(B2);
@@ -647,7 +647,7 @@ L3:
         function.code(new Instruction.Binary("+",
                 new Operand.RegisterOperand(x3),
                 new Operand.RegisterOperand(x2),
-                new Operand.ConstantOperand(1, typeDictionary.INT)));
+                new Operand.IntConstantOperand(1, typeDictionary.INT)));
         function.code(new Instruction.ConditionalBranch(B2,
                 new Operand.RegisterOperand(p), B2, function.exit));
         function.currentBlock.addSuccessor(B2);
@@ -711,10 +711,10 @@ L1:
         Register b2 = regPool.newReg("b2", typeDictionary.INT);
         function.code(new Instruction.ArgInstruction(new Operand.LocalRegisterOperand(p, argSymbol)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(42, typeDictionary.INT),
+                new Operand.IntConstantOperand(42, typeDictionary.INT),
                 new Operand.RegisterOperand(a1)));
         function.code(new Instruction.Move(
-                new Operand.ConstantOperand(24, typeDictionary.INT),
+                new Operand.IntConstantOperand(24, typeDictionary.INT),
                 new Operand.RegisterOperand(b1)));
         BasicBlock B2 = function.createBlock();
         function.startBlock(B2);

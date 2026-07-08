@@ -167,9 +167,12 @@ public class ExitSSABriggs {
                         workList.add(item);
                     }
                 }
-                else if (src instanceof Operand.ConstantOperand srcConstantOperand) {
-                    addMoveAtBBEnd(block, srcConstantOperand, dest);
+                else if (src instanceof Operand.IntConstantOperand ||
+                         src instanceof Operand.FloatConstantOperand ||
+                         src instanceof Operand.NullConstantOperand) {
+                    addMoveAtBBEnd(block, src, dest);
                 }
+                else throw new IllegalStateException("Unexpected phi source operand: " + src);
             }
             /* Engineering a Compiler: To solve the swap problem
                we can detect cases where phi functions reference the
@@ -253,8 +256,8 @@ public class ExitSSABriggs {
             cbr.replaceUse(src,dest);
         }
     }
-    /* Insert a copy from constant src to dst at end of BB */
-    private void addMoveAtBBEnd(BasicBlock block, Operand.ConstantOperand src, Register dest) {
+    /* Insert a copy from constant src (int, float or null) to dst at end of BB */
+    private void addMoveAtBBEnd(BasicBlock block, Operand src, Register dest) {
         var inst = new Instruction.Move(src, new Operand.RegisterOperand(dest));
         insertAtEnd(block, inst);
     }

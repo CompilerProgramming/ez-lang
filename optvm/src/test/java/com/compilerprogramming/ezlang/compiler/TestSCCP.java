@@ -150,16 +150,16 @@ L5->L7=Executable
 L6->L7=NOT Executable
 Lattices:
 j_3=1
-%t5_0=varying
-k_3=varying
-k_4=varying
+%t5_0=int*
+k_3=int*
+k_4=int*
 j_4=1
 i_0=1
 j_0=1
 k_0=0
-k_1=varying
+k_1=int*
 j_1=1
-%t3_0=varying
+%t3_0=int*
 %t4_0=1
 After SCCP changes:
 L0:
@@ -183,5 +183,85 @@ L4:
 L1:
 """;
         Assert.assertEquals(expected, actual);
+    }
+
+    // Exercises float constant propagation: a and b are variables (not
+    // front-end folded), so SCCP must propagate the float constants and
+    // fold a+b to 3.75, replacing the return operand.
+    @Test
+    public void testFloatConstantPropagation() {
+        String src = """
+func foo()->Float {
+    var a = 1.25
+    var b = 2.5
+    return a + b
+}
+""";
+        String actual = compileSrc(src);
+        Assert.assertTrue("expected folded float return in:\n" + actual,
+                actual.contains("ret 3.75"));
+    }
+
+    // Exercises the ref lattice's null-constant comparison folding
+    // (evalLogical: null == null -> 1). The comparison is not folded by the
+    // front end, so it reaches SCCP as a Binary over two null operands.
+    @Test
+    public void testNullConstantComparisonFolding() {
+        String src = """
+func foo()->Int {
+    return null == null
+}
+""";
+        String actual = compileSrc(src);
+        Assert.assertTrue("expected folded null comparison in:\n" + actual,
+                actual.contains("ret 1"));
+    }
+
+    // Exercises the ref lattice tracking a freshly allocated struct as
+    // not-null (NewStruct -> F_REF_NOT_NULL), which prints as "not-null"
+    // in the lattice dump.
+    @Test
+    public void testNewStructIsNotNull() {
+        String src = """
+struct Foo
+{
+    var i: Int
+}
+func foo()->Int
+{
+    var f = new Foo{ i = 1 }
+    return f.i
+}
+""";
+        String actual = compileSrc(src);
+        Assert.assertTrue("expected a not-null lattice entry in:\n" + actual,
+                actual.contains("not-null"));
+    }
+
+    // Exercises not-null vs null comparison folding in evalLogical: a freshly
+    // allocated (not-null) struct compared to null folds the condition to
+    // false, so the dead 'return 0' branch is eliminated after SCCP.
+    @Test
+    public void testNotNullComparedToNullFolds() {
+        String src = """
+struct Foo
+{
+    var i: Int
+}
+func foo()->Int
+{
+    var f: Foo?
+    f = new Foo{ i = 1 }
+    if (f == null)
+        return 0
+    return 1
+}
+""";
+        String actual = compileSrc(src);
+        String postSccp = actual.substring(actual.indexOf("After SCCP changes:"));
+        Assert.assertFalse("dead 'return 0' branch should be folded away:\n" + actual,
+                postSccp.contains("ret 0"));
+        Assert.assertTrue("reachable 'return 1' should remain:\n" + actual,
+                postSccp.contains("ret 1"));
     }
 }

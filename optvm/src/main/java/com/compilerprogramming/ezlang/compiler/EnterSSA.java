@@ -9,6 +9,8 @@ import java.util.*;
  * The algorithm is described in the paper
  * 'Practical Improvements to the Construction and Destruction
  * of Single Static Assigment Form' by Preston Briggs.
+ *
+ * See docs/ssa-construction.md for a description of this implementation.
  */
 public class EnterSSA {
 

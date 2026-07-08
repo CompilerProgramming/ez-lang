@@ -45,8 +45,11 @@ public class Interpreter {
             instruction = currentBlock.instructions.get(ip);
             switch (instruction) {
                 case Instruction.Ret retInst -> {
-                    if (retInst.value() instanceof Operand.ConstantOperand constantOperand) {
+                    if (retInst.value() instanceof Operand.IntConstantOperand constantOperand) {
                         execStack.stack[base] = new Value.IntegerValue(constantOperand.value);
+                    }
+                    else if (retInst.value() instanceof Operand.FloatConstantOperand constantOperand) {
+                        execStack.stack[base] = new Value.FloatValue(constantOperand.value);
                     }
                     else if (retInst.value() instanceof Operand.NullConstantOperand) {
                         execStack.stack[base] = new Value.NullValue();
@@ -63,8 +66,11 @@ public class Interpreter {
                         if (moveInst.from() instanceof Operand.RegisterOperand fromReg) {
                             execStack.stack[base + toReg.frameSlot()] = execStack.stack[base + fromReg.frameSlot()];
                         }
-                        else if (moveInst.from() instanceof Operand.ConstantOperand constantOperand) {
+                        else if (moveInst.from() instanceof Operand.IntConstantOperand constantOperand) {
                             execStack.stack[base + toReg.frameSlot()] = new Value.IntegerValue(constantOperand.value);
+                        }
+                        else if (moveInst.from() instanceof Operand.FloatConstantOperand constantOperand) {
+                            execStack.stack[base + toReg.frameSlot()] = new Value.FloatValue(constantOperand.value);
                         }
                         else if (moveInst.from() instanceof Operand.NullConstantOperand) {
                             execStack.stack[base + toReg.frameSlot()] = new Value.NullValue();
@@ -87,11 +93,14 @@ public class Interpreter {
                             condition = integerValue.value != 0;
                         }
                         else {
-                            condition = value != null;
+                            throw new InterpreterException("Condition expression must be Int type");
                         }
                     }
-                    else if (cbrInst.condition() instanceof Operand.ConstantOperand constantOperand) {
+                    else if (cbrInst.condition() instanceof Operand.IntConstantOperand constantOperand) {
                         condition = constantOperand.value != 0;
+                    }
+                    else if (cbrInst.condition() instanceof Operand.FloatConstantOperand) {
+                        throw new InterpreterException("Condition expression must be Int type");
                     }
                     else throw new IllegalStateException();
                     if (condition)
@@ -110,8 +119,11 @@ public class Interpreter {
                         if (arg instanceof Operand.RegisterOperand param) {
                             execStack.stack[reg] = execStack.stack[base + param.frameSlot()];
                         }
-                        else if (arg instanceof Operand.ConstantOperand constantOperand) {
+                        else if (arg instanceof Operand.IntConstantOperand constantOperand) {
                             execStack.stack[reg] = new Value.IntegerValue(constantOperand.value);
+                        }
+                        else if (arg instanceof Operand.FloatConstantOperand constantOperand) {
+                            execStack.stack[reg] = new Value.FloatValue(constantOperand.value);
                         }
                         else if (arg instanceof Operand.NullConstantOperand) {
                             execStack.stack[reg] = new Value.NullValue();
@@ -138,80 +150,79 @@ public class Interpreter {
                             default: throw new CompilerException("Invalid unary op");
                         }
                     }
+                    else if (unaryValue instanceof Value.FloatValue floatValue && unaryInst.unop.equals("-")) {
+                        execStack.stack[base + unaryInst.result().frameSlot()] = new Value.FloatValue(-floatValue.value);
+                    }
                     else
                         throw new IllegalStateException("Unexpected unary operand: " + unaryOperand);
                 }
                 case Instruction.Binary binaryInst -> {
-                    long x, y;
                     long value = 0;
-                    boolean intOp = true;
-                    if (binaryInst.binOp.equals("==") || binaryInst.binOp.equals("!=")) {
-                        Operand.RegisterOperand nonNullLitOperand = null;
-                        if (binaryInst.left() instanceof Operand.NullConstantOperand) {
-                            nonNullLitOperand = (Operand.RegisterOperand)binaryInst.right();
-                        }
-                        else if (binaryInst.right() instanceof Operand.NullConstantOperand) {
-                            nonNullLitOperand = (Operand.RegisterOperand)binaryInst.left();
-                        }
-                        if (nonNullLitOperand != null) {
-                            intOp = false;
-                            Value otherValue = execStack.stack[base + nonNullLitOperand.frameSlot()];
+                    Value leftValue = valueFromOperand(binaryInst.left(), execStack, base);
+                    Value rightValue = valueFromOperand(binaryInst.right(), execStack, base);
+                    if ((leftValue instanceof Value.NullValue || rightValue instanceof Value.NullValue) &&
+                            (binaryInst.binOp.equals("==") || binaryInst.binOp.equals("!="))) {
+                        boolean equal = leftValue instanceof Value.NullValue && rightValue instanceof Value.NullValue;
+                        value = switch (binaryInst.binOp) {
+                            case "==" -> equal ? 1 : 0;
+                            case "!=" -> equal ? 0 : 1;
+                            default -> throw new IllegalStateException();
+                        };
+                        execStack.stack[base + binaryInst.result().frameSlot()] = new Value.IntegerValue(value);
+                    }
+                    else {
+                        if (leftValue instanceof Value.FloatValue left && rightValue instanceof Value.FloatValue right) {
+                            double x = left.value;
+                            double y = right.value;
                             switch (binaryInst.binOp) {
-                                case "==": {
-                                    value = otherValue instanceof Value.NullValue ? 1 : 0;
-                                    break;
-                                }
-                                case "!=": {
-                                    value = otherValue instanceof Value.NullValue ? 0 : 1;
-                                    break;
-                                }
-                                default:
-                                    throw new IllegalStateException();
+                                case "+" -> execStack.stack[base + binaryInst.result().frameSlot()] = new Value.FloatValue(x + y);
+                                case "-" -> execStack.stack[base + binaryInst.result().frameSlot()] = new Value.FloatValue(x - y);
+                                case "*" -> execStack.stack[base + binaryInst.result().frameSlot()] = new Value.FloatValue(x * y);
+                                case "/" -> execStack.stack[base + binaryInst.result().frameSlot()] = new Value.FloatValue(x / y);
+                                case "==" -> value = x == y ? 1 : 0;
+                                case "!=" -> value = x != y ? 1 : 0;
+                                case "<" -> value = x < y ? 1 : 0;
+                                case ">" -> value = x > y ? 1 : 0;
+                                case "<=" -> value = x <= y ? 1 : 0;
+                                case ">=" -> value = x >= y ? 1 : 0;
+                                default -> throw new IllegalStateException();
+                            }
+                            if (binaryInst.binOp.equals("==") || binaryInst.binOp.equals("!=") || binaryInst.binOp.equals("<") || binaryInst.binOp.equals(">") || binaryInst.binOp.equals("<=") || binaryInst.binOp.equals(">="))
+                                execStack.stack[base + binaryInst.result().frameSlot()] = new Value.IntegerValue(value);
+                        }
+                        else if (leftValue instanceof Value.IntegerValue left && rightValue instanceof Value.IntegerValue right) {
+                            long x = left.value;
+                            long y = right.value;
+                            switch (binaryInst.binOp) {
+                                case "+": value = x + y; break;
+                                case "-": value = x - y; break;
+                                case "*": value = x * y; break;
+                                case "/": value = x / y; break;
+                                case "%": value = x % y; break;
+                                case "==": value = x == y ? 1 : 0; break;
+                                case "!=": value = x != y ? 1 : 0; break;
+                                case "<": value = x < y ? 1: 0; break;
+                                case ">": value = x > y ? 1 : 0; break;
+                                case "<=": value = x <= y ? 1 : 0; break;
+                                case ">=": value = x >= y ? 1 : 0; break;
+                                default: throw new IllegalStateException();
                             }
                             execStack.stack[base + binaryInst.result().frameSlot()] = new Value.IntegerValue(value);
                         }
-                    }
-                    if (intOp) {
-                        if (binaryInst.left() instanceof Operand.ConstantOperand constant)
-                            x = constant.value;
-                        else if (binaryInst.left() instanceof Operand.RegisterOperand registerOperand)
-                            x = ((Value.IntegerValue) execStack.stack[base + registerOperand.frameSlot()]).value;
                         else throw new IllegalStateException();
-                        if (binaryInst.right() instanceof Operand.ConstantOperand constant)
-                            y = constant.value;
-                        else if (binaryInst.right() instanceof Operand.RegisterOperand registerOperand)
-                            y = ((Value.IntegerValue) execStack.stack[base + registerOperand.frameSlot()]).value;
-                        else throw new IllegalStateException();
-                        switch (binaryInst.binOp) {
-                            case "+": value = x + y; break;
-                            case "-": value = x - y; break;
-                            case "*": value = x * y; break;
-                            case "/": value = x / y; break;
-                            case "%": value = x % y; break;
-                            case "==": value = x == y ? 1 : 0; break;
-                            case "!=": value = x != y ? 1 : 0; break;
-                            case "<": value = x < y ? 1: 0; break;
-                            case ">": value = x > y ? 1 : 0; break;
-                            case "<=": value = x <= y ? 1 : 0; break;
-                            case ">=": value = x >= y ? 1 : 0; break;
-                            default: throw new IllegalStateException();
-                        }
-                        execStack.stack[base + binaryInst.result().frameSlot()] = new Value.IntegerValue(value);
                     }
                 }
                 case Instruction.NewArray newArrayInst -> {
                     long size = 0;
                     Value initValue = null;
-                    if (newArrayInst.len() instanceof Operand.ConstantOperand constantOperand)
+                    if (newArrayInst.len() instanceof Operand.IntConstantOperand constantOperand)
                         size = constantOperand.value;
                     else if (newArrayInst.len() instanceof Operand.RegisterOperand registerOperand) {
                         Value.IntegerValue indexValue = (Value.IntegerValue) execStack.stack[base + registerOperand.frameSlot()];
                         size = (long) indexValue.value;
                     }
-                    if (newArrayInst.initValue() instanceof Operand.ConstantOperand constantOperand)
-                        initValue = new Value.IntegerValue(constantOperand.value);
-                    else if (newArrayInst.initValue() instanceof Operand.RegisterOperand registerOperand)
-                        initValue = execStack.stack[base + registerOperand.frameSlot()];
+                    if (newArrayInst.initValue() != null)
+                        initValue = valueFromOperand(newArrayInst.initValue(), execStack, base);
                     execStack.stack[base + newArrayInst.destOperand().frameSlot()] = new Value.ArrayValue(newArrayInst.type, size, initValue);
                 }
                 case Instruction.NewStruct newStructInst -> {
@@ -221,7 +232,7 @@ public class Interpreter {
                     if (arrayStoreInst.arrayOperand() instanceof Operand.RegisterOperand arrayOperand) {
                         Value.ArrayValue arrayValue = (Value.ArrayValue) execStack.stack[base + arrayOperand.frameSlot()];
                         int index = 0;
-                        if (arrayStoreInst.indexOperand() instanceof Operand.ConstantOperand constant) {
+                        if (arrayStoreInst.indexOperand() instanceof Operand.IntConstantOperand constant) {
                             index = (int) constant.value;
                         }
                         else if (arrayStoreInst.indexOperand() instanceof Operand.RegisterOperand registerOperand) {
@@ -229,17 +240,7 @@ public class Interpreter {
                             index = (int) indexValue.value;
                         }
                         else throw new IllegalStateException();
-                        Value value;
-                        if (arrayStoreInst.sourceOperand() instanceof Operand.ConstantOperand constantOperand) {
-                            value = new Value.IntegerValue(constantOperand.value);
-                        }
-                        else if (arrayStoreInst.sourceOperand() instanceof Operand.NullConstantOperand) {
-                            value = new Value.NullValue();
-                        }
-                        else if (arrayStoreInst.sourceOperand() instanceof Operand.RegisterOperand registerOperand) {
-                            value = execStack.stack[base + registerOperand.frameSlot()];
-                        }
-                        else throw new IllegalStateException();
+                        Value value = valueFromOperand(arrayStoreInst.sourceOperand(), execStack, base);
                         if (index == arrayValue.values.size())
                             arrayValue.values.add(value);
                         else
@@ -249,7 +250,7 @@ public class Interpreter {
                 case Instruction.ArrayLoad arrayLoadInst -> {
                     if (arrayLoadInst.arrayOperand() instanceof Operand.RegisterOperand arrayOperand) {
                         Value.ArrayValue arrayValue = (Value.ArrayValue) execStack.stack[base + arrayOperand.frameSlot()];
-                        if (arrayLoadInst.indexOperand() instanceof Operand.ConstantOperand constant) {
+                        if (arrayLoadInst.indexOperand() instanceof Operand.IntConstantOperand constant) {
                             execStack.stack[base + arrayLoadInst.destOperand().frameSlot()] = arrayValue.values.get((int) constant.value);
                         }
                         else if (arrayLoadInst.indexOperand() instanceof Operand.RegisterOperand registerOperand) {
@@ -263,17 +264,7 @@ public class Interpreter {
                     if (setFieldInst.structOperand() instanceof Operand.RegisterOperand structOperand) {
                         Value.StructValue structValue = (Value.StructValue) execStack.stack[base + structOperand.frameSlot()];
                         int index = setFieldInst.fieldIndex;
-                        Value value;
-                        if (setFieldInst.sourceOperand() instanceof Operand.ConstantOperand constant) {
-                            value = new Value.IntegerValue(constant.value);
-                        }
-                        else if (setFieldInst.sourceOperand() instanceof Operand.NullConstantOperand) {
-                            value = new Value.NullValue();
-                        }
-                        else if (setFieldInst.sourceOperand() instanceof Operand.RegisterOperand registerOperand) {
-                            value = execStack.stack[base + registerOperand.frameSlot()];
-                        }
-                        else throw new IllegalStateException();
+                        Value value = valueFromOperand(setFieldInst.sourceOperand(), execStack, base);
                         structValue.fields[index] = value;
                     } else throw new IllegalStateException();
                 }
@@ -291,6 +282,18 @@ public class Interpreter {
         return returnValue;
     }
 
+
+    private Value valueFromOperand(Operand operand, ExecutionStack execStack, int base) {
+        if (operand instanceof Operand.IntConstantOperand constant)
+            return new Value.IntegerValue(constant.value);
+        if (operand instanceof Operand.FloatConstantOperand constant)
+            return new Value.FloatValue(constant.value);
+        if (operand instanceof Operand.RegisterOperand registerOperand)
+            return execStack.stack[base + registerOperand.frameSlot()];
+        if (operand instanceof Operand.NullConstantOperand)
+            return new Value.NullValue();
+        throw new IllegalStateException();
+    }
     static class Frame {
         Frame caller;
         int base;

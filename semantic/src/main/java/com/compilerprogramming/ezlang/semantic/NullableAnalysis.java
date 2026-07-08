@@ -4,11 +4,14 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import com.compilerprogramming.ezlang.lexer.Token;
 import com.compilerprogramming.ezlang.parser.AST;
 import com.compilerprogramming.ezlang.types.EZType;
+import com.compilerprogramming.ezlang.types.LatticeElement;
 import com.compilerprogramming.ezlang.types.Scope;
 import com.compilerprogramming.ezlang.types.Symbol;
 import com.compilerprogramming.ezlang.types.TypeDictionary;
 
 import java.util.*;
+
+import static com.compilerprogramming.ezlang.types.LatticeElement.*;
 
 /**
  * Input is a CFG over AST. the CFG should capture control flow that is
@@ -47,16 +50,20 @@ public class NullableAnalysis {
                 var type = varSymbol.type;
                 LatticeElement elem;
                 if (varSymbol instanceof Symbol.ParameterSymbol) {
-                    if (type.isPrimitive())
+                    if (type instanceof EZType.EZTypeInteger)
                         elem = new LatticeElement(F_INT_BOTTOM);
+                    else if (type instanceof EZType.EZTypeFloat)
+                        elem = new LatticeElement(F_FLT_BOTTOM);
                     else if (type instanceof EZType.EZTypeNullable)
                         elem = new LatticeElement(F_REF_BOTTOM);
                     else
                         elem = new LatticeElement(F_REF_NOT_NULL);
                 }
                 else {
-                    elem = type.isPrimitive()
+                    elem = type instanceof EZType.EZTypeInteger
                             ? new LatticeElement(F_INT_TOP)
+                            : type instanceof EZType.EZTypeFloat
+                            ? new LatticeElement(F_FLT_TOP)
                             : new LatticeElement(F_REF_TOP);
                 }
                 latticeElements.add(elem);
@@ -67,274 +74,6 @@ public class NullableAnalysis {
         }
     }
 
-    //                 TOP
-    //              /     \
-    //         REF_TOP   INT_TOP
-    //         /     \    /  |   \
-    //      NULL NOT_NULL ZERO NZC NZV
-    //         \     /     \  |  /
-    //        REF_BOTTOM   INT_BOTTOM
-    //              \       /
-    //               BOTTOM
-
-    static final byte F_TOP = 0;             // no usable fact yet
-
-    static final byte F_REF_TOP = 1;         // known reference type, value unknown
-    static final byte F_REF_NOT_NULL = 2;
-    static final byte F_REF_NULL = 3;
-    static final byte F_REF_BOTTOM = 4;      // maybe null
-
-    static final byte F_INT_TOP = 5;         // known int type, value unknown
-    static final byte F_INT_ZERO = 6;
-    static final byte F_INT_NONZERO_CONST = 7;
-    static final byte F_INT_NONZERO_VARYING = 8;
-    static final byte F_INT_BOTTOM = 9;      // may be zero or non-zero
-
-    static final byte F_BOTTOM = 10;         // impossible / contradiction
-
-    // Associated with each register
-    static final class LatticeElement {
-        public byte kind;
-        private long intValue;
-
-        public LatticeElement(byte kind) {
-            this.kind = kind;
-        }
-        public LatticeElement(byte kind,long value) {
-            this.kind = kind;
-            this.intValue = value;
-        }
-        public LatticeElement(long value) {
-            kind = F_INT_TOP;
-            setIntValue(value);
-        }
-        LatticeElement copy() {
-            return new LatticeElement(kind, intValue);
-        }
-
-        boolean isTrue() {
-            return kind == F_INT_NONZERO_CONST || kind == F_INT_NONZERO_VARYING;
-        }
-        boolean isFalse() {
-            return kind == F_INT_ZERO;
-        }
-        boolean isIntegerConstant() {
-            return kind == F_INT_ZERO || kind == F_INT_NONZERO_CONST;
-        }
-        boolean setIntValue(long value) {
-            byte prevKind = kind;
-            if (kind == F_INT_TOP) {
-                this.intValue = value;
-                this.kind = value == 0 ? F_INT_ZERO : F_INT_NONZERO_CONST;
-            }
-            else if (kind == F_INT_ZERO && value != 0) {
-                this.kind = F_INT_BOTTOM;
-            }
-            else if (kind == F_INT_NONZERO_CONST && (value == 0 || value != intValue)) {
-                this.kind = F_INT_BOTTOM;
-            }
-            else if (!isInteger()) {
-                throw new CompilerException("Cannot assign integer value to reference type");
-            }
-            return (kind != prevKind);
-        }
-        boolean meet(LatticeElement other) {
-            byte old = kind;
-
-            // universal top/bottom
-            if (kind == F_TOP) {
-                copyFrom(other);
-                return true;
-            }
-
-            if (kind == F_BOTTOM || other.kind == F_TOP)
-                return false;
-
-            if (other.kind == F_BOTTOM) {
-                kind = F_BOTTOM;
-                return kind != old;
-            }
-
-            // same value
-            if (kind == other.kind) {
-                if (kind == F_INT_NONZERO_CONST &&
-                        intValue != other.intValue) {
-                    kind = F_INT_NONZERO_VARYING;
-                }
-                return kind != old;
-            }
-
-            // reference lattice
-            if (isReference(kind) && isReference(other.kind)) {
-                kind = meetReference(other);
-                return kind != old;
-            }
-
-            // integer lattice
-            if (isInteger(kind) && isInteger(other.kind)) {
-                meetInteger(other);
-                return kind != old;
-            }
-
-            // impossible
-            kind = F_BOTTOM;
-            return kind != old;
-        }
-
-        private byte meetReference(LatticeElement other) {
-
-            if (kind == F_REF_TOP)
-                return other.kind;
-
-            if (other.kind == F_REF_TOP)
-                return kind;
-
-            return switch (kind) {
-
-                case F_REF_NULL ->
-                        other.kind == F_REF_NULL
-                                ? F_REF_NULL
-                                : F_REF_BOTTOM;
-
-                case F_REF_NOT_NULL ->
-                        other.kind == F_REF_NOT_NULL
-                                ? F_REF_NOT_NULL
-                                : F_REF_BOTTOM;
-
-                case F_REF_BOTTOM ->
-                        F_REF_BOTTOM;
-
-                default ->
-                        F_BOTTOM;
-            };
-        }
-
-        private void meetInteger(LatticeElement other) {
-
-            if (kind == F_INT_TOP) {
-                copyFrom(other);
-                return;
-            }
-
-            if (other.kind == F_INT_TOP)
-                return;
-
-            switch (kind) {
-
-                case F_INT_ZERO -> {
-                    if (other.kind != F_INT_ZERO)
-                        kind = F_INT_BOTTOM;
-                }
-
-                case F_INT_NONZERO_CONST -> {
-                    switch (other.kind) {
-
-                        case F_INT_NONZERO_CONST -> {
-                            if (intValue != other.intValue)
-                                kind = F_INT_NONZERO_VARYING;
-                        }
-
-                        case F_INT_NONZERO_VARYING ->
-                                kind = F_INT_NONZERO_VARYING;
-
-                        case F_INT_ZERO,
-                             F_INT_BOTTOM ->
-                                kind = F_INT_BOTTOM;
-                    }
-                }
-
-                case F_INT_NONZERO_VARYING -> {
-                    if (other.kind == F_INT_ZERO ||
-                            other.kind == F_INT_BOTTOM)
-                        kind = F_INT_BOTTOM;
-                }
-
-                case F_INT_BOTTOM -> {
-                }
-            }
-        }
-        private static boolean isReference(byte kind) {
-            return kind >= F_REF_TOP && kind <= F_REF_BOTTOM;
-        }
-
-        private static boolean isInteger(byte kind) {
-            return kind >= F_INT_TOP && kind <= F_INT_BOTTOM;
-        }
-        void copyFrom(LatticeElement other) {
-            LatticeElement copy = other.copy();
-            this.kind = copy.kind;
-            this.intValue = copy.intValue;
-        }
-        boolean isTop() {
-            return kind == F_TOP;
-        }
-
-        boolean isBottom() {
-            return kind == F_BOTTOM;
-        }
-
-        boolean isReference() {
-            return isReference(kind);
-        }
-
-        boolean isInteger() {
-            return isInteger(kind);
-        }
-
-        boolean isNull() {
-            return kind == F_REF_NULL;
-        }
-
-        boolean isNotNull() {
-            return kind == F_REF_NOT_NULL;
-        }
-
-        boolean isMaybeNull() {
-            return kind == F_REF_BOTTOM;
-        }
-
-        boolean isZero() {
-            return kind == F_INT_ZERO;
-        }
-
-        boolean isNonZero() {
-            return kind == F_INT_NONZERO_CONST ||
-                    kind == F_INT_NONZERO_VARYING;
-        }
-        @Override
-        public String toString() {
-            return switch (kind) {
-                case F_TOP -> "⊤";
-
-                case F_REF_TOP -> "ref";
-                case F_REF_NOT_NULL -> "not-null";
-                case F_REF_NULL -> "null";
-                case F_REF_BOTTOM -> "maybe-null";
-
-                case F_INT_TOP -> "int";
-                case F_INT_ZERO -> "0";
-                case F_INT_NONZERO_CONST -> Long.toString(intValue);
-                case F_INT_NONZERO_VARYING -> "non-zero";
-                case F_INT_BOTTOM -> "int?";
-
-                case F_BOTTOM -> "⊥";
-
-                default -> throw new CompilerException("Unknown lattice kind: " + kind);
-            };
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (o == null || getClass() != o.getClass()) return false;
-            LatticeElement that = (LatticeElement) o;
-            return kind == that.kind && intValue == that.intValue;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(kind, intValue);
-        }
-    }
     static final class Lattice {
         final LatticeElement[] vars;
 
@@ -451,7 +190,11 @@ public class NullableAnalysis {
                 return new LatticeElement(F_REF_NULL);
             }
             if (lit.value.kind == Token.Kind.NUM) {
-                return new LatticeElement(Long.parseLong(lit.value.str));
+                if (lit.type instanceof EZType.EZTypeInteger)
+                    return new LatticeElement(lit.value.num.longValue());
+                if (lit.type instanceof EZType.EZTypeFloat)
+                    return new LatticeElement(lit.value.num.doubleValue());
+                return factFromType(lit.type);
             }
         }
 
@@ -463,7 +206,11 @@ public class NullableAnalysis {
                     return new LatticeElement(-v.intValue);
                 if (v.isInteger())
                     return new LatticeElement(F_INT_BOTTOM);
-                throw new CompilerException("Cannot apply - to non integer");
+                if (v.isFloatConstant())
+                    return new LatticeElement(-v.floatValue);
+                if (v.isFloat())
+                    return new LatticeElement(F_FLT_BOTTOM);
+                throw new CompilerException("Cannot apply - to non numeric value");
             }
 
             if (un.op.str.equals("!")) {
@@ -499,11 +246,13 @@ public class NullableAnalysis {
                         if (b.kind == F_INT_ZERO)
                             throw new CompilerException("Division by zero");
                         value = a.intValue / b.intValue;
+                        isArith = true;
                     }
                     case "%"  -> {
                         if (b.kind == F_INT_ZERO)
                             throw new CompilerException("Division by zero");
                         value = a.intValue % b.intValue;
+                        isArith = true;
                     }
 
                     case "==" -> {
@@ -543,24 +292,44 @@ public class NullableAnalysis {
                 }
                 return result;
             }
+            if (a.isFloatConstant() && b.isFloatConstant()) {
+                double floatValue = 0.0;
+                long intValue = 0;
+                boolean isArith = false;
+                switch (bin.op.str) {
+                    case "+" -> {
+                        floatValue = a.floatValue + b.floatValue;
+                        isArith = true;
+                    }
+                    case "-" -> {
+                        floatValue = a.floatValue - b.floatValue;
+                        isArith = true;
+                    }
+                    case "*" -> {
+                        floatValue = a.floatValue * b.floatValue;
+                        isArith = true;
+                    }
+                    case "/" -> {
+                        floatValue = a.floatValue / b.floatValue;
+                        isArith = true;
+                    }
+                    case "==" -> intValue = a.floatValue == b.floatValue ? 1 : 0;
+                    case "!=" -> intValue = a.floatValue != b.floatValue ? 1 : 0;
+                    case "<" -> intValue = a.floatValue < b.floatValue ? 1 : 0;
+                    case "<=" -> intValue = a.floatValue <= b.floatValue ? 1 : 0;
+                    case ">" -> intValue = a.floatValue > b.floatValue ? 1 : 0;
+                    case ">=" -> intValue = a.floatValue >= b.floatValue ? 1 : 0;
+                    default -> throw new CompilerException("Unknown binary operator " + bin.op.str);
+                }
+                if (isArith)
+                    return new LatticeElement(floatValue);
+                return intValue == 1
+                        ? new LatticeElement(F_INT_NONZERO_CONST, 1)
+                        : new LatticeElement(F_INT_ZERO);
+            }
             return factFromType(bin.type);
         }
 
-        return new LatticeElement(F_BOTTOM);
-    }
-
-    LatticeElement factFromType(EZType type) {
-        if (type != null) {
-            if (type instanceof EZType.EZTypeNullable)
-                return new LatticeElement(F_REF_BOTTOM);
-            else if (type instanceof EZType.EZTypeNull)
-                return new LatticeElement(F_REF_NULL);
-            else if (type instanceof EZType.EZTypeArray ||
-                     type instanceof EZType.EZTypeStruct)
-                return new LatticeElement(F_REF_NOT_NULL);
-            else if (type.isPrimitive())
-                return new LatticeElement(F_INT_BOTTOM);
-        }
         return new LatticeElement(F_BOTTOM);
     }
 
@@ -616,9 +385,15 @@ public class NullableAnalysis {
     }
 
     private void checkAssignment(EZType type, LatticeElement lattice) {
-        if (type.isPrimitive()) {
+        if (type instanceof EZType.EZTypeInteger) {
             if (!lattice.isInteger())
-                throw new CompilerException("Cannot assign reference/null to int");
+                throw new CompilerException("Cannot assign non-int value to int");
+            return;
+        }
+
+        if (type instanceof EZType.EZTypeFloat) {
+            if (!lattice.isFloat())
+                throw new CompilerException("Cannot assign non-float value to float");
             return;
         }
 
