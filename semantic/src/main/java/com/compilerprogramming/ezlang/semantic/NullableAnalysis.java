@@ -199,6 +199,11 @@ public class NullableAnalysis {
         }
 
         if (e instanceof AST.UnaryExpr un) {
+            if (un.op.str.equals("#")) {
+                checkDereference(un.expr, facts);
+                return factFromType(un.type);
+            }
+
             LatticeElement v = analyzeExpr(un.expr, facts);
 
             if (un.op.str.equals("-")) {

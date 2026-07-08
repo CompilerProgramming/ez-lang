@@ -465,6 +465,25 @@ public class Compiler {
         return objPtr;
     }
 
+    // # operator
+    private Node compileArrayLengthExpr(AST.Expr arrayExpr, int lineNumber) {
+        Node objPtr = compileExpr(arrayExpr).keep();
+        if( !(objPtr._type instanceof TypeMemPtr ptr) ) {
+            throw new CompilerException("Unexpected type " + objPtr._type.str(), lineNumber);
+        }
+        String name = "#";
+        TypeStruct base = ptr._obj;
+        int fidx = base.find(name);
+        if( fidx == -1 ) throw error("Accessing unknown field '" + name + "' from '" + ptr.str() + "'", lineNumber);
+        Field f = base._fields[fidx];
+        Node off = con(base.offset(fidx)).keep();
+        Node load = new LoadNode(name, f._alias, f._type, memAlias(f._alias), objPtr, off);
+        load = peep(load);
+        objPtr.unkeep();
+        off.unkeep();
+        return load;
+    }
+
     private Node compileArrayIndexExpr(AST.ArrayLoadExpr arrayLoadExpr) {
         Node objPtr = compileExpr(arrayLoadExpr.array).keep();
         // Sanity check expr for being a reference
@@ -531,12 +550,23 @@ public class Compiler {
         return objPtr.unkeep();
     }
 
-    private Node newArray(TypeStruct ary, Node len) {
+    private Node newArray(TypeStruct ary, Node arrayLen) {
         int base = ary.aryBase ();
-        int scale= ary.aryScale();
-        Node size = peep(new AddNode(con(base),peep(new ShlNode(len.keep(),con(scale)))));
-        return newStruct(ary,size);
+        int scale = ary.aryScale();
+        // array size = base + len << scale
+        Node size = peep(new AddNode(con(base),peep(new ShlNode(arrayLen.keep(),con(scale)))));
+        Node ptr = newStruct(ary,size).keep();
+        // arrays are structs with two fields
+        // first field is length
+        // second field is [] data
+        Field[] fs = ary._fields;
+        // store length as int32
+        Node mem = memAlias(fs[0]._alias);
+        Node st = new StoreNode(fs[0]._fname,fs[0]._alias,fs[0]._type,mem,ptr,con(ary.offset(0)),arrayLen.unkeep(),true).peephole();
+        memAlias(fs[0]._alias,st);
+        return ptr.unkeep();
     }
+
     /**
      * Return a NewNode initialized memory.
      * @param obj is the declared type, with GLB fields
@@ -586,6 +616,7 @@ public class Compiler {
             }
             // Maybe below we should explicitly set Int
             case "!": return peep(new NotNode(compileExpr(unaryExpr.expr)));
+            case "#": return compileArrayLengthExpr(unaryExpr.expr, unaryExpr.lineNumber);
             default: throw new CompilerException("Invalid unary op", unaryExpr.lineNumber);
         }
     }

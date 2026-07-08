@@ -664,4 +664,20 @@ L3:
 """, result);
     }
 
+    @Test
+    public void testArrayLengthUnaryOperator() {
+        String src = """
+                func foo(a: [Int])->Int {
+                    return #a;
+                }
+                """;
+        String result = compileSrc(src);
+        Assert.assertEquals("""
+L0:
+	load 0
+	length
+	jump L1
+L1:
+""", result);
+    }
 }

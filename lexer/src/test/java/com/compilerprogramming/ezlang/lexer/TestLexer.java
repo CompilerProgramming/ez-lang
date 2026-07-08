@@ -12,7 +12,7 @@ public class TestLexer {
     public void testLexer() {
         String src = """
                 // A comment
-                Ident=,>=<>>=!=!1.5{0}11()[]+-*/ //Another comment
+                Ident=,>=<>>=!=!1.5{0}11()[]+-*/# //Another comment
                 """;
         Lexer lexer = new Lexer(src);
         Token[] expected = new Token[]{
@@ -37,7 +37,8 @@ public class TestLexer {
                 Token.newPunct("+", 0),
                 Token.newPunct("-", 0),
                 Token.newPunct("*", 0),
-                Token.newPunct("/", 0)
+                Token.newPunct("/", 0),
+                Token.newPunct("#", 0)
         };
 
         List<Token> tokens = new ArrayList<>();

@@ -558,4 +558,18 @@ func main()->Int
         Assert.assertTrue(value instanceof Value.FloatValue floatValue
                 && Math.abs(floatValue.value - 3.5) < 0.000001);
     }
+    @Test
+    public void testArrayLengthUnaryOperator() {
+        String src = """
+                func foo()->Int {
+                    var a = new [Int] {1,2,3}
+                    var b = new [Int] {len=0,value=0}
+                    return #a + #b
+                }
+                """;
+        var value = compileAndRun(src, "foo");
+        Assert.assertNotNull(value);
+        Assert.assertTrue(value instanceof Value.IntegerValue integerValue
+                && integerValue.value == 3);
+    }
 }

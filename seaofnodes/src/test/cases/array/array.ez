@@ -1,0 +1,3 @@
+func foo()->Int {
+  return #new [Int]{42,84}
+}

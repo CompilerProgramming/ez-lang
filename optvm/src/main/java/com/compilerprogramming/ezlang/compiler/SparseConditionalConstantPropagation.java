@@ -452,6 +452,11 @@ public class SparseConditionalConstantPropagation {
     }
 
     private static boolean evalUnary(LatticeElement cell, LatticeElement input, String unOp, EZType resultType) {
+        if (unOp.equals("#")) {
+            if (input.kind == F_TOP || input.kind == F_REF_TOP)
+                return false;
+            return cell.meetWithTypeBottom(resultType);
+        }
         if (input.isIntegerConstant()) {
             long value = input.kind == F_INT_ZERO ? 0 : input.intValue;
             if (unOp.equals("-"))

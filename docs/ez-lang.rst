@@ -222,6 +222,7 @@ Following table describes the available operators by their precedence (low to hi
 | ``%``      |                 |          |
 +------------+-----------------+----------+
 | ``-``      | negate          | Unary    |
+| ``#``      | array length    | Unary    |
 | ``!``      |                 |          |
 +------------+-----------------+----------+
 | ``(...)``, | function call,  | Postfix  |

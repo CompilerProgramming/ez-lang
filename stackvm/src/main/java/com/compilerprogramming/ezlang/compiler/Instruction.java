@@ -36,6 +36,7 @@ public class Instruction {
     public static final int MUL_F = 28;
     public static final int DIV_F = 29;
     public static final int NEG_F = 30;
+    public static final int LENGTH = 31;
 
     static final String[] opNames = {
         "ret",
@@ -68,7 +69,8 @@ public class Instruction {
         "subf",
         "mulf",
         "divf",
-        "negf"
+        "negf",
+        "length"
     };
 
     public final int opcode;
