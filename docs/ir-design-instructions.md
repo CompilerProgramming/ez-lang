@@ -1,6 +1,6 @@
 This is part of the series that discusses what you must think about when deciding how to represent IRs.
 
-* [Part 1 - Virtual Registers](https://github.com/CompilerProgramming/ez-lang/wiki/Virtual-Registers)
+* [Part 1 - Virtual Registers](ir-virtual-registers.md)
 
 # Linear IR
 
@@ -8,7 +8,7 @@ The discussion here is primarily for linear Intermediate Representations. By lin
 
 # Organize Instructions Into Basic Blocks
 
-For many algorithms we need to operate on the control flow graph. It is important to organize the instructions into Basic Blocks, where each BB encapsulates instructions that are executed sequentially. The final instruction in the BB must a jump to some other BB.
+For many algorithms we need to operate on the control flow graph. It is important to organize the instructions into Basic Blocks, where each BB encapsulates instructions that are executed sequentially. In this implementation, non-exit blocks are normally terminated by a jump or branch to another BB.
 
 ```java
 public class BasicBlock {
@@ -30,12 +30,16 @@ public class BasicBlock {
 
 # Instruction Operands
 
-Instructions deal with values, some of those may be Virtual Registers, some Constants, and even Basic Blocks, for example in jump Instructions. We therefore create a type called Operand that represents values handled by an Instruction. Operands can have different subtypes in an OO design (or an Operand can be a union or sumtype in non-OO languages) - where each subtype is for a specific type of value.
+Instructions deal with values, some of those may be Virtual Registers and some Constants. We therefore create a type called Operand that represents values handled by an Instruction. Operands can have different subtypes in an OO design (or an Operand can be a union or sumtype in non-OO languages) - where each subtype is for a specific type of value.
+
+Control-flow targets are modeled separately. For example, `Instruction.Jump` and `Instruction.ConditionalBranch` store their target `BasicBlock`s as instruction fields, while register and constant values appear in the instruction's operand list.
 
 ```java
 class Operand {}
 class RegisterOperand extends Operand {}
-class ConstantOperand extends Operand {}
+class IntConstantOperand extends Operand {}
+class FloatConstantOperand extends Operand {}
+class NullConstantOperand extends Operand {}
 ```
 
 # Instructions Define and Use Registers
@@ -47,7 +51,7 @@ From the optimization point of view, it is important to model the Instruction in
 * Replace a register that is defined
 * Replace a specific use of a Register - or replace all uses - a Register may be replaced by another Register or by something else such as a Constant.
 
-Whether an Instruction defines a Register and/or uses Values including Registers depends on the Instruction type. So each Instruction type sets its own requirements, however, all Instructions satisfy the interface requirements above, so that the optimizer can treat each instruction uniformly.
+Whether an Instruction defines a Register and/or uses Values including Registers depends on the Instruction type. So each Instruction type sets its own requirements. Most non-phi instructions satisfy the interface requirements above, so that optimizers can treat them uniformly. Phi instructions and temporary parallel-copy instructions are deliberately special-cased; see below.
 
 ```java
 class Instruction {
@@ -64,13 +68,15 @@ class Instruction {
     // Replace specific use
     boolean replaceUse(Register oldUse, Register newUse);
     // Replace specific register with constant
-    void replaceWithConstant(Register register, ConstantOperand constantOperand);
+    void replaceUseWithConstant(Register register, Operand constantOperand);
 }
 ```
 
 # Phis Are Special
 
 Phi instructions also define a Register and use one or more Registers, but Phis do not have the same semantics as other instructions in many situations, such as when computing Liveness. So a consideration is how to model Phi instructions, whether they obey the general interface or have their own specialized interface. In EeZee language we give Phi instructions their own interface, which is similar to the general instruction but ensures that Phis cannot be erroneously manipulated by the optimizer. This has a trade off because there are scenarios where Phis do not require the special treatment.
+
+In the implementation, `Phi.def()`, `Phi.replaceDef()`, `Phi.replaceUses()`, and `Phi.replaceUse()` throw `UnsupportedOperationException`, and `Phi.uses()` returns an empty list. Code that needs phi definitions or inputs must use the phi-specific methods.
 
 ```java
 class Phi extends Instruction {
@@ -85,9 +91,15 @@ class Phi extends Instruction {
         boolean isRegisterInput(int i);
         Register[] inputRegisters();
         void replaceInput(int i, Register newReg);
+        boolean replaceInput(Register oldReg, Register newReg);
+        void addInput(Register register);
         void removeInput(int i);
 }
 ```
+
+# Parallel Copies Are Temporary
+
+SSA destruction can temporarily introduce `ParallelCopyInstruction`. Like phi nodes, parallel copies do not support the ordinary def/use interface. They are sequenced into ordinary move instructions before the pass finishes.
 
 # Instructions Can Be Replaced
 

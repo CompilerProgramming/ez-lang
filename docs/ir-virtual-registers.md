@@ -94,7 +94,7 @@ Observe following:
 
 * The name of the SSA register is a concatenation of the original name with SSA version.
 * The SSA register's original Reg Number refers back to the register ID for `y`.
-* The frame slot is set to -1 on SSA registers - SSA registers are converted to regular registers when the compiler exits SSA. See below on life cycle of the frame slot.
+* The frame slot is set to -1 on SSA registers when they are created. Exiting SSA removes phi nodes and inserts copies, but it does not convert `SSARegister` objects back into plain `Register` objects. Register allocation later assigns frame slots to the registers that remain in the IR.
 * The register ID is always unique per register.
 
 The compiler can treat each Register as unique by referring to the register ID, or ignore versions and treat all three registers as part of the same underlying name.
@@ -106,7 +106,8 @@ The compiler can treat each Register as unique by referring to the register ID, 
 | Pre-SSA  | Virtual       | Same as Register ID |
 | SSA      | Virtual       | Same as Register ID |
 | SSA      | SSA Register  | -1                  |
-| Post Register Allocation | Virtual | Slot assigned by Register Allocator |
+| After exiting SSA | Virtual and SSA registers that remain in the IR | Existing slots are unchanged until register allocation |
+| Post Register Allocation | Any register that remains in the IR | Slot assigned by Register Allocator |
 
 ## Each Register Has Unique Integer ID
 
@@ -165,4 +166,4 @@ public class Register {
 
 # See Also
 
-* [IR Design - Instructions](https://github.com/CompilerProgramming/ez-lang/wiki/IR-Design-%E2%80%90-Instructions)
+* [IR Design - Instructions](ir-design-instructions.md)
