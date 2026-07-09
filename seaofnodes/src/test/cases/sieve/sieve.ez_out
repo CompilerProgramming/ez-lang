@@ -1,118 +1,114 @@
 ---sieve { int -> *![int] #1}---------------------------
 0000 4883EC28    subi  rsp -= #40
                  N:rdi
-0004 48895C2418  mov   [rsp+24] = rbx                 // def/loop #3
-0009 48896C2410  mov   [rsp+16] = rbp                 // def/loop #3
-000E 4C89642408  mov   [rsp+8] = r12                  // def/loop #3
-0013 4C892C24    mov   [rsp+0] = r13                  // def/loop #3
-0017 4C8BE7      mov   r12 = rdi                      // def/empty1 #0
-001A 4A8D34E508  lea   rsi = r12<<3 + #8
-001F 000000
-0022 B902000000  ldi   rcx = #2
-0027 488BC7      mov   rax = rdi                      // use/empty1 #0
-002A 489948F7F9  div   rax = rax / rcx                // kill rdx
-002F 488D1CC508  lea   rbx = rax<<3 + #8
-0034 000000
-0037 BF01000000  alloc ldi   rcx = #1
-003C E800000000  call  #calloc
-0041 4C8BE8      mov   r13 = rax                      // def/empty1 #2
-0044 488BF3      mov   rsi = rbx                      // use/empty1 #1
-0047 BF01000000  alloc ldi   rcx = #1
-004C E800000000  call  #calloc
-0051 488BD8      mov   rbx = rax                      // def/empty1 #2
-0054 4D33C9      xor   r9,r9
-0057 B802000000  ldi   rax = #2
-005C BA04000000  ldi   rdx = #4
+0004 48895C2420  mov   [rsp+32] = rbx                 // def/loop #2
+0009 48896C2418  mov   [rsp+24] = rbp                 // def/loop #2
+000E 4C89642410  mov   [rsp+16] = r12                 // def/loop #2
+0013 4C896C2408  mov   [rsp+8] = r13                  // def/loop #2
+0018 4C893424    mov   [rsp+0] = r14                  // def/loop #2
+001C 4C8BF7      mov   r14 = rdi                      // def/empty1 #1
+001F 4C8BEF      mov   r13 = rdi                      // use/empty1 #1
+0022 4A8D34ED08  lea   rsi = r13<<3 + #8
+0027 000000
+002A BB02000000  ldi   rbx = #2
+002F 4D33E4      xor   r12,r12
+0032 BF01000000  alloc ldi   rcx = #1
+0037 E800000000  call  #calloc
+003C 488BE8      mov   rbp = rax                      // def/empty1 #1
+003F 448928      st4   [rax],r13
+0042 498BC6      mov   rax = r14                      // use/empty1 #0
+0045 489948F7FB  div   rax = rax / rbx                // kill rdx
+004A 488BD8      mov   rbx = rax                      // def/empty1 #1
+004D 488D34C508  lea   rsi = rax<<3 + #8
+0052 000000
+0055 BF01000000  alloc ldi   rcx = #1
+005A E800000000  call  #calloc
+005F 4C8BF0      mov   r14 = rax                      // def/empty1 #1
+0062 B802000000  ldi   rax = #2
+0067 B904000000  ldi   rcx = #4
 LOOP11:
-                 nprimes:r9,p:rax,p:rdx
-0061 488BC8      mov   rcx = rax                      // def/self #1
-0064 493BD4      cmp   rdx, r12
-0067 7D59        j>=   LOOP8                          // L22
+                 nprimes:r12,p:rax,p:rcx
+006C 488BD0      mov   rdx = rax                      // def/self #1
+006F 493BCD      cmp   rcx, r13
+0072 7D48        j>=   L9                             // L22
 L22:
 LOOP21:
-                 p:rcx
-0069 488BC1      mov   rax = rcx                      // use/self/use #1
-006C 48FFC0      inc   rax += #1
-006F 498BD5      mov   rdx = r13                      // use/empty1 #2
-0072 48817CCA08  test8 , [rdx+rcx*8+8]
-0077 0000000000000000
-007F 7405        j==   L17                            // L23
+                 p:rdx
+0074 488BC2      mov   rax = rdx                      // use/self/use #1
+0077 48FFC0      inc   rax += #1
+007A 48817CD508  test8 , [rbp+rdx*8+8]
+007F 0000000000000000
+0087 7405        j==   L17                            // L23
 L23:
-0081 488BC8      mov   rcx = rax                      // use/self/use #1
-0084 EBE3        jmp   LOOP21
-L244:
+0089 488BD0      mov   rdx = rax                      // use/self/use #1
+008C EBE6        jmp   LOOP21
+L235:
 L17:
-0086 488BF1      mov   rsi = rcx                      // use/self/two #1
-0089 48C1E601    shli  rsi <<= #1
-008D 4D8BC1      mov   r8 = r9                        // use/self/phi #1
-0090 488BF9      mov   rdi = rcx                      // use/self/use #1
-0093 488BD3      mov   rdx = rbx                      // use/empty1 #2
+008E 498BCE      mov   rcx = r14                      // use/empty1 #1
+0091 4A8954E108  st8   [rcx+r12*8+8],rdx
+0096 488BCA      mov   rcx = rdx                      // use/self/use #1
+0099 48C1E101    shli  rcx <<= #1
 LOOP16:
-                 $3:rdx,$3:r8,i:rsi,$3:rdi
-0096 488BEE      mov   rbp = rsi                      // def/self #1
-0099 4A897CC208  st8   [rdx+r8*8+8],rdi
-009E 493BEC      cmp   rbp, r12
-00A1 7D13        j>=   L14                            // L57
-L57:
-00A3 488BF5      mov   rsi = rbp                      // use/self/use #1
-00A6 4803F1      add   rsi += rcx
-00A9 4C8BC5      mov   r8 = rbp                       // use/self/use #1
-00AC BF01000000  ldi   rdi = #1
-00B1 498BD5      mov   rdx = r13                      // use/self/use #1
-00B4 EBE0        jmp   LOOP16
-L243:
+                 i:rcx
+009D 493BCD      cmp   rcx, r13
+00A0 7D0E        j>=   L14                            // L52
+L52:
+00A2 48C744CD08  st8   [rbp+rcx*8+8],#1
+00A7 01000000
+00AB 4803CA      add   rcx += rdx
+00AE EBED        jmp   LOOP16
+L234:
 L14:
-00B6 49FFC1      inc   r9 += #1
-00B9 488BD0      mov   rdx = rax                      // use/self/use #1
-00BC 480FAFD0    mul   rdx = rdx * rax
-00C0 EB9F        jmp   LOOP11
-L242:
+00B0 49FFC4      inc   r12 += #1
+00B3 488BC8      mov   rcx = rax                      // use/self/use #1
+00B6 480FAFC8    mul   rcx = rcx * rax
+00BA EBB0        jmp   LOOP11
+L233:
 L9:
+00BC 488BC2      mov   rax = rdx                      // use/self/use #1
 LOOP8:
-                 nprimes:r9,p:rcx
-00C2 498BE9      mov   rbp = r9                       // def/self #1
-00C5 493BCC      cmp   rcx, r12
-00C8 7D24        j>=   L6                             // L70
-L70:
-00CA 49817CCD08  test8 , [r13+rcx*8+8]
-00CF 0000000000000000
-00D7 7405        j==   L66                            // L81
-L81:
-00D9 4C8BCD      mov   r9 = rbp                       // use/self/use #1
-00DC EB0B        jmp   L65
-L241:
-L66:
-00DE 48894CEB08  st8   [rbx+rbp*8+8],rcx
-00E3 4C8BCD      mov   r9 = rbp                       // use/self/use #1
-00E6 49FFC1      inc   r9 += #1
-L65:
-                 nprimes:r9
-00E9 48FFC1      inc   rcx += #1
-00EC EBD4        jmp   LOOP8
-L240:
+                 nprimes:r12,p:rax
+00BF 493BC5      cmp   rax, r13
+00C2 7D1C        j>=   L6                             // L68
+L68:
+00C4 48817CC508  test8 , [rbp+rax*8+8]
+00C9 0000000000000000
+00D1 7508        j!=   L63                            // L64
+L64:
+00D3 4B8944E608  st8   [r14+r12*8+8],rax
+00D8 49FFC4      inc   r12 += #1
+L79:
+L63:
+                 nprimes:r12
+00DB 48FFC0      inc   rax += #1
+00DE EBDF        jmp   LOOP8
+L232:
 L6:
-00EE 488D34ED08  lea   rsi = rbp<<3 + #8
-00F3 000000
-00F6 BF01000000  alloc ldi   rcx = #1
-00FB E800000000  call  #calloc
-0100 33C9        xor   rcx,rcx
+00E0 4A8D34E508  lea   rsi = r12<<3 + #8
+00E5 000000
+00E8 41891E      st4   [r14],rbx
+00EB BF01000000  alloc ldi   rcx = #1
+00F0 E800000000  call  #calloc
+00F5 33C9        xor   rcx,rcx
 LOOP5:
                  j:rcx
-0102 483BCD      cmp   rcx, rbp
-0105 7D0F        j>=   L3                             // L84
-L84:
-0107 488B54CB08  ld8   rdx,[rbx+rcx*8+8]
-010C 488954C808  st8   [rax+rcx*8+8],rdx
-0111 48FFC1      inc   rcx += #1
-0114 EBEC        jmp   LOOP5
-L239:
+00F7 493BCC      cmp   rcx, r12
+00FA 7D0F        j>=   L3                             // L82
+L82:
+00FC 498B54CE08  ld8   rdx,[r14+rcx*8+8]
+0101 488954C808  st8   [rax+rcx*8+8],rdx
+0106 48FFC1      inc   rcx += #1
+0109 EBEC        jmp   LOOP5
+L231:
 L3:
-0116 4C8B2C24    mov   r13 = [rsp+0]                  // use/loop/use #3
-011A 4C8B642408  mov   r12 = [rsp+8]                  // use/loop/use #3
-011F 488B6C2410  mov   rbp = [rsp+16]                 // use/loop/use #3
-0124 488B5C2418  mov   rbx = [rsp+24]                 // use/loop/use #3
-0129 4883C428C3  addi  rsp += #40
-012E             ret
+010B 448920      st4   [rax],r12
+010E 4C8B3424    mov   r14 = [rsp+0]                  // use/loop/use #2
+0112 4C8B6C2408  mov   r13 = [rsp+8]                  // use/loop/use #2
+0117 4C8B642410  mov   r12 = [rsp+16]                 // use/loop/use #2
+011C 488B6C2418  mov   rbp = [rsp+24]                 // use/loop/use #2
+0121 488B5C2420  mov   rbx = [rsp+32]                 // use/loop/use #2
+0126 4883C428C3  addi  rsp += #40
+012B             ret
 ---{ int -> *![int] #1}---------------------------
 
 ---eq { *![int] *![int] int -> int #0}---------------------------
@@ -129,11 +125,11 @@ L109:
 L107:
 0143 48FFC0      inc   rax += #1
 0146 EBEA        jmp   LOOP105
-L238:
+L230:
 L122:
 0148 33C0        xor   rax,rax
 014A EB05        jmp   L102
-L237:
+L229:
 L103:
 014C B801000000  ldi   rax = #1
 L102:
@@ -164,12 +160,14 @@ L102:
 01B1 000000
 01B4 48C7413811  st8   [rcx+56],#17
 01B9 000000
-01BC 48C7414013  st8   [rcx+64],#19
-01C1 000000
-01C4 488B3C24    mov   rdi = [rsp+0]                  // use/empty1 #0
-01C8 488BF0      mov   rsi = rax                      // use/empty1 #0
-01CB BA08000000  ldi   rdx = #8
-01D0 E85BFFFFFF  call  eq  rdi, rsi, rdx
-01D5 4883C408C3  addi  rsp += #8
-01DA             ret
+01BC C701080000  st4   [rcx],#8
+01C1 00
+01C2 48C7414013  st8   [rcx+64],#19
+01C7 000000
+01CA 488B3C24    mov   rdi = [rsp+0]                  // use/empty1 #0
+01CE 488BF0      mov   rsi = rax                      // use/empty1 #0
+01D1 BA08000000  ldi   rdx = #8
+01D6 E855FFFFFF  call  eq  rdi, rsi, rdx
+01DB 4883C408C3  addi  rsp += #8
+01E0             ret
 ---{ -> int #0}---------------------------

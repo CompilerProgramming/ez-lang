@@ -233,6 +233,8 @@ public class Compiler {
             // A reference to array in EeZee means
             // *array in SoN
             Type elementType = getSONType(structTypes,typeArray.getElementType());
+            if (elementType instanceof TypeMemPtr ptr && ptr.notNull())
+                throw new CompilerException("Array element reference types must be nullable", -1);
             TypeStruct ts = TypeStruct.makeArray(TypeInteger.U32, _code.getALIAS(), elementType, _code.getALIAS());
             TypeMemPtr ptr = TypeMemPtr.make((byte)2,ts);
             structTypes.put(typeArray.name(), ptr); // Array type name is not same as ptr str()

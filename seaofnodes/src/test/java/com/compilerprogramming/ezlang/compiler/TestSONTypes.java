@@ -4,6 +4,7 @@ import com.compilerprogramming.ezlang.compiler.codegen.CodeGen;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
 import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
+import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -142,6 +143,47 @@ func foo()->T4 {
 }
 """;
         compileSrc(src);
+    }
+
+    @Test(expected = CompilerException.class)
+    public void testArrayOfStructRejected() {
+        String src = """
+struct Point { var x: Int }
+func foo()->Int {
+  var points = new [Point] { len = 1, new Point { x = 42 } }
+  return points[0].x
+}
+""";
+        compileSrc(src);
+    }
+
+    @Test
+    public void testArrayOfNullableStructAllowed() {
+        String src = """
+struct Point { var x: Int }
+func foo()->Int {
+  var points = new [Point?] { len = 2, null, new Point { x = 42 } }
+  return #points
+}
+""";
+        compileSrc(src);
+    }
+
+    @Test
+    public void testArrayLoadNullCheckNarrowsNullableElement() {
+        String src = """
+struct Point { var x: Int }
+func foo(a: Int)->Int {
+  var points = new [Point?] { len = 2 }
+  points[a] = new Point { x = 42 }
+  var p = points[1]
+  if (p != null)
+    return p.x
+  return -1
+}
+""";
+        var compiler = new CodeGen(src);
+        compiler.parse().opto().typeCheck();
     }
 
     @Test

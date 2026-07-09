@@ -1,0 +1,11 @@
+struct Point {
+  var x: Int
+}
+
+func foo()->Int {
+  var points = new [Point?] { len = 2, null, new Point { x = 42 } }
+  var p = points[1]
+  if (p != null)
+  	return p.x
+  return -1
+}
