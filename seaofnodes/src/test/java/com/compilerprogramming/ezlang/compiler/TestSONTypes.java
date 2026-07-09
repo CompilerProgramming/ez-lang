@@ -170,6 +170,24 @@ func foo()->Int {
         compileSrc(src);
     }
 
+    @Test
+    public void testStructLayoutsDoNotLeakAcrossCompilations() {
+        compileSrc("""
+struct Point { var x: Int }
+func foo()->Int {
+  var p = new Point { x = 1 }
+  return p.x
+}
+""");
+        compileSrc("""
+struct Point { var y: Int }
+func foo()->Int {
+  var p = new Point { y = 2 }
+  return p.y
+}
+""");
+    }
+
     @Ignore("Bug in backend")
     @Test
     public void testArrayLoadNullCheckNarrowsNullableElement() {

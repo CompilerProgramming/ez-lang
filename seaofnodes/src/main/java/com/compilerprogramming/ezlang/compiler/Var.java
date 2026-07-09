@@ -2,7 +2,6 @@ package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.compiler.type.*;
 
-
 /**
  *  The tracked fields are now complex enough to deserve a array-of-structs layout
  */
@@ -27,10 +26,8 @@ public class Var {
         _fref = fref;
     }
     public Type type() {
-        if( !_type.isFRef() ) return _type;
-        // Update self to no longer use the forward ref type
-        Type def = Compiler.TYPES.get(((TypeMemPtr)_type)._obj._name);
-        return (_type=_type.meet(def));
+        assert !_type.isFRef();
+        return _type;
     }
 
     // Forward reference variables (not types) must be BOTTOM and
