@@ -1,11 +1,15 @@
 package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.compiler.codegen.CodeGen;
+import com.compilerprogramming.ezlang.lexer.Lexer;
+import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
 import org.junit.Before;
 import org.junit.Test;
 
 import static com.compilerprogramming.ezlang.compiler.Main.PORTS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class TestSONTypes {
 
@@ -203,6 +207,73 @@ func foo()->Int {
         compileSrc(src);
     }
 
+    @Test
+    public void test20ShortCircuitReturn() {
+        String src = """
+func foo(a: Int, b: Int)->Int {
+  return a && b
+}
+""";
+        compileSrc(src);
+    }
+
+    @Test
+    public void test21ShortCircuitVarInitializerAndCallArg() {
+        String src = """
+func id(a: Int)->Int { return a }
+func foo(a: Int, b: Int)->Int {
+  var x = id(a || b)
+  return x
+}
+""";
+        compileSrc(src);
+    }
+
+    @Test
+    public void test22ShortCircuitConditions() {
+        String src = """
+func foo(a: Int, b: Int)->Int {
+  var x = 0
+  if (a && b) {
+    x = 1
+  }
+  while (x || b) {
+    x = 0
+  }
+  return x
+}
+""";
+        compileSrc(src);
+    }
+
+    @Test
+    public void test23ShortCircuitCodegen() {
+        testAllCPUs("""
+                func main()->Int {
+                    var a = 0
+                    var b = 1
+                    return a && b
+                }
+                """, 0, null);
+    }
+    @Test
+    public void test24ShortCircuitWhileConditionLoweredInsideLoop() {
+        String src = """
+func foo(a: Int, b: Int)->Int {
+  var x = 0
+  while (x || b) {
+    x = 0
+  }
+  return x
+}
+""";
+        Parser parser = new Parser();
+        var program = parser.parse(new Lexer(src));
+        ShortCircuitLowerer.lower(program);
+        String lowered = program.toString();
+        assertTrue(lowered.contains("while(1)"));
+        assertTrue(lowered.contains("while(1)\n{\nvar __sc0 = 1"));
+    }
     static void testCPU( String src, String cpu, String os, int spills, String stop ) {
         CodeGen code = new CodeGen(src);
         code.parse().opto().typeCheck().loopTree().instSelect(cpu,os).GCM().localSched().regAlloc().encode();

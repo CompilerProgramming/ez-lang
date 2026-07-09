@@ -1,0 +1,10 @@
+func foo(a: Int, b: Int)->Int {
+  var x = 0
+  if (a && b) {
+    x = 1
+  }
+  while (x || b) {
+    x = 0
+  }
+  return x
+}

@@ -9,6 +9,7 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.AST;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
 import com.compilerprogramming.ezlang.semantic.NullableAnalysis;
 import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
 import com.compilerprogramming.ezlang.semantic.SemaDefineTypes;
@@ -82,12 +83,24 @@ public class Compiler {
     public TypeDictionary createAST(String src) {
         Parser parser = new Parser();
         var program = parser.parse(new Lexer(src));
+        analyze(program);
+        // Lower boolean && and || to if blocks after nullable analysis has seen the original guards.
+        ShortCircuitLowerer.lower(program);
+        return bind(program);
+    }
+
+    private TypeDictionary analyze(AST.Program program) {
+        var typeDict = bind(program);
+        NullableAnalysis.analyze(typeDict);
+        return typeDict;
+    }
+
+    private TypeDictionary bind(AST.Program program) {
         var typeDict = new TypeDictionary();
         var sema = new SemaDefineTypes(typeDict);
         sema.analyze(program);
         var sema2 = new SemaAssignTypes(typeDict);
         sema2.analyze(program);
-        NullableAnalysis.analyze(typeDict);
         return typeDict;
     }
 

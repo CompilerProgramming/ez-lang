@@ -8,12 +8,26 @@ import com.compilerprogramming.ezlang.exceptions.InterpreterException;
 import com.compilerprogramming.ezlang.types.Symbol;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Collection;
+import java.util.List;
+
+@RunWith(Parameterized.class)
 public class TestInterpreter {
+
+    @Parameterized.Parameter
+    public boolean lowerShortCircuit;
+
+    @Parameterized.Parameters
+    public static Collection<Object[]> data() {
+        return List.of(new Object[] { false }, new Object[] { true });
+    }
 
     Value compileAndRun(String src, String mainFunction) {
         var compiler = new Compiler();
-        var typeDict = compiler.compileSrc(src);
+        var typeDict = compiler.compileSrc(src, lowerShortCircuit);
         var compiled = compiler.dumpIR(typeDict);
         System.out.println(compiled);
         var interpreter = new Interpreter(typeDict);
@@ -513,7 +527,7 @@ func main()->Int
                 }
                 """;
         var compiler = new Compiler();
-        var typeDict = compiler.compileSrc(src);
+        var typeDict = compiler.compileSrc(src, lowerShortCircuit);
         var functionSymbol = (Symbol.FunctionTypeSymbol) typeDict.lookup("foo");
         var function = (CompiledFunction) functionSymbol.code();
         for (int i = 0; i < function.entry.instructions.size(); i++) {
