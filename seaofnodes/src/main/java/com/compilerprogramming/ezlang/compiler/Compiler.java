@@ -543,6 +543,10 @@ public class Compiler {
         Type tf = f._type;
         Node mem = memAlias(f._alias);
         Node st = new StoreNode(f._fname,f._alias,tf,mem,objPtr,off.unkeep(),val.unkeep(),true).peephole();
+        // Arrays include control, as a proxy for a safety range check
+        // Structs don't need this; they only need a NPE check which is
+        // done via the type system.
+        st.setDef(0,ctrl());
         memAlias(f._alias,st);
         return objPtr;
     }
@@ -642,6 +646,8 @@ public class Compiler {
         switch (opCode) {
             case "&&":
             case "||":
+                // We should never reach here because the AST is lowered such that these ops
+                // have been replaced by standard if blocks.
                 throw new CompilerException("Not yet implemented", binaryExpr.lineNumber);
             case "==":
                 idx=2;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.EQF(lhs, null) : new BoolNode.EQ(lhs, null);

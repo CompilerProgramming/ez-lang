@@ -150,17 +150,13 @@ public class SemaDefineTypes implements ASTVisitor {
 
     @Override
     public ASTVisitor enter(AST.SimpleTypeExpr simpleTypeExpr) {
-        if (simpleTypeExpr.type == null) {
-            simpleTypeExpr.type = getSimpleType(simpleTypeExpr);
-        }
+        simpleTypeExpr.type = getSimpleType(simpleTypeExpr);
         return this;
     }
 
     @Override
     public ASTVisitor enter(AST.NullableSimpleTypeExpr simpleTypeExpr) {
-        if (simpleTypeExpr.type == null) {
-            simpleTypeExpr.type = getNullableSimpleType(simpleTypeExpr);
-        }
+        simpleTypeExpr.type = getNullableSimpleType(simpleTypeExpr);
         return this;
     }
 
@@ -180,16 +176,12 @@ public class SemaDefineTypes implements ASTVisitor {
 
     @Override
     public ASTVisitor enter(AST.ArrayTypeExpr arrayTypeExpr) {
-        if (arrayTypeExpr.type == null) {
-            arrayTypeExpr.type = getArrayType(arrayTypeExpr);
-        }
+        arrayTypeExpr.type = getArrayType(arrayTypeExpr);
         return this;
     }
 
     public ASTVisitor enter(AST.NullableArrayTypeExpr arrayTypeExpr) {
-        if (arrayTypeExpr.type == null) {
-            arrayTypeExpr.type = getNullableArrayType(arrayTypeExpr);
-        }
+        arrayTypeExpr.type = getNullableArrayType(arrayTypeExpr);
         return this;
     }
 
