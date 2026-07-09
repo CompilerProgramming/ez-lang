@@ -3,6 +3,8 @@ package com.compilerprogramming.ezlang.parser;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import org.junit.Test;
 
+import static org.junit.Assert.assertTrue;
+
 public class TestParser {
 
     @Test
@@ -57,5 +59,24 @@ func main() {
         var program = parser.parse(new Lexer(src));
         System.out.println(program.toString());
         return;
+    }
+
+    @Test
+    public void testShortCircuitWhileConditionLoweredInsideLoop() {
+        Parser parser = new Parser();
+        String src = """
+                func foo(a: Int, b: Int)->Int {
+                  var x = 0
+                  while (x || b) {
+                    x = 0
+                  }
+                  return x
+                }
+                """;
+        var program = parser.parse(new Lexer(src));
+        ShortCircuitLowerer.lower(program);
+        String lowered = program.toString();
+        assertTrue(lowered.contains("while(1)"));
+        assertTrue(lowered.contains("while(1)\n{\nvar __sc0 = 1"));
     }
 }

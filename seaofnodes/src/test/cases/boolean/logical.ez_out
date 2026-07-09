@@ -1,0 +1,44 @@
+---foo { int int -> int #0}---------------------------
+                 a:rdi,b:rsi
+0000 488BD6      mov   rdx = rsi                      // def/empty1 #0
+0003 4883FF00    test  rdi
+0007 7504        j!=   L19                            // L29
+L29:
+0009 33C9        xor   rcx,rcx
+000B EB03        jmp   L18
+L74:
+L19:
+000D 488BCA      mov   rcx = rdx                      // use/self/phi #1
+L18:
+                 __sc0:rcx
+0010 4883F900    test  rcx
+0014 7504        j!=   L14                            // L35
+L35:
+0016 33C0        xor   rax,rax
+0018 EB05        jmp   L13
+L73:
+L14:
+001A B801000000  ldi   rax = #1
+L13:
+                 x:rax
+LOOP12:
+                 x:rax
+001F 4883F800    test  rax
+0023 7407        j==   L8                             // L42
+L42:
+0025 BE01000000  ldi   rsi = #1
+002A EB03        jmp   L7
+L72:
+L8:
+002C 488BF2      mov   rsi = rdx                      // use/self/phi #1
+L7:
+                 __sc1:rsi
+002F 4883FE00    test  rsi
+0033 7404        j==   L3                             // L36
+L36:
+0035 33C0        xor   rax,rax
+0037 EBE6        jmp   LOOP12
+L71:
+L3:
+0039 C3          ret
+---{ int int -> int #0}---------------------------

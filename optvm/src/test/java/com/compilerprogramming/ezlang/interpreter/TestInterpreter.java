@@ -38,12 +38,19 @@ public class TestInterpreter {
 
     @Parameterized.Parameters
     public static Collection<Object[]> data() {
+        List<EnumSet<Options>> baseOptions = List.of(
+                Options.NONE,
+                Options.OPT,
+                Options.OPT_B,
+                Options.OPT_ISSA,
+                Options.OPT_ISSA_B);
         List<Object[]> parameters = new ArrayList<>();
-        parameters.add(new Object[] { Options.NONE });
-        parameters.add(new Object[] { Options.OPT });
-        parameters.add(new Object[] { Options.OPT_B });
-        parameters.add(new Object[] { Options.OPT_ISSA });
-        parameters.add(new Object[] { Options.OPT_ISSA_B });
+        for (EnumSet<Options> base : baseOptions) {
+            parameters.add(new Object[] { EnumSet.copyOf(base) });
+            EnumSet<Options> lowered = EnumSet.copyOf(base);
+            lowered.add(Options.LOWER_SHORT_CIRCUIT);
+            parameters.add(new Object[] { lowered });
+        }
         return parameters;
     }
 

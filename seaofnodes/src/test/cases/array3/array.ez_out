@@ -1,0 +1,24 @@
+---foo { -> int #0}---------------------------
+0000 4883EC18    subi  rsp -= #24
+0004 48895C2408  mov   [rsp+8] = rbx                  // def/loop #2
+0009 BE08000000  ldi   rsi = #8
+000E BF01000000  alloc ldi   rcx = #1
+0013 E800000000  call  #calloc
+0018 48890424    mov   [rsp+0] = rax                  // def/empty1 #1
+001C 488BD8      mov   rbx = rax                      // use/empty1 #1
+001F BE18000000  ldi   rsi = #24
+0024 BF01000000  alloc ldi   rcx = #1
+0029 E800000000  call  #calloc
+002E 33C9        xor   rcx,rcx
+0030 48894808    st8   [rax+8],rcx
+0034 488B1424    mov   rdx = [rsp+0]                  // use/empty1 #0
+0038 48C7022A00  st8   [rdx],#42
+003D 0000
+003F C700020000  st4   [rax],#2
+0044 00
+0045 48895810    st8   [rax+16],rbx
+0049 B82A000000  ldi   rax = #42
+004E 488B5C2408  mov   rbx = [rsp+8]                  // use/loop/use #2
+0053 4883C418C3  addi  rsp += #24
+0058             ret
+---{ -> int #0}---------------------------

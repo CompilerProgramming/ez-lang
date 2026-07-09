@@ -2,6 +2,7 @@ package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
 import com.compilerprogramming.ezlang.semantic.NullableAnalysis;
 import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
 import com.compilerprogramming.ezlang.semantic.SemaDefineTypes;
@@ -31,13 +32,31 @@ public class Compiler {
     public TypeDictionary compileSrc(String src, EnumSet<Options> options) {
         Parser parser = new Parser();
         var program = parser.parse(new Lexer(src));
+        var typeDict = analyze(program);
+        // Some backend such as the SON do not
+        // support compiling boolean short-circuit operators
+        // so we lower them to if blocks. But this is also
+        // done during tests to prove that the lowering works.
+        if (options.contains(Options.LOWER_SHORT_CIRCUIT)) {
+            ShortCircuitLowerer.lower(program);
+            typeDict = bind(program);
+        }
+        compile(typeDict, options);
+        return typeDict;
+    }
+
+    private TypeDictionary analyze(com.compilerprogramming.ezlang.parser.AST.Program program) {
+        var typeDict = bind(program);
+        NullableAnalysis.analyze(typeDict);
+        return typeDict;
+    }
+
+    private TypeDictionary bind(com.compilerprogramming.ezlang.parser.AST.Program program) {
         var typeDict = new TypeDictionary();
         var sema = new SemaDefineTypes(typeDict);
         sema.analyze(program);
         var sema2 = new SemaAssignTypes(typeDict);
         sema2.analyze(program);
-        NullableAnalysis.analyze(typeDict);
-        compile(typeDict, options);
         return typeDict;
     }
     public static String dumpIR(TypeDictionary typeDictionary) {

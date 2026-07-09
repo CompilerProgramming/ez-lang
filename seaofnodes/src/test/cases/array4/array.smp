@@ -1,0 +1,10 @@
+struct Point { int x; };
+
+Point?[] !points = new Point?[2];
+points[arg] = new Point { x = 42; };
+Point? p = points[1];
+
+if (p != null)
+    return p.x;
+
+return -1;

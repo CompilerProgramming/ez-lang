@@ -10,6 +10,7 @@ public enum Options {
     SCCP,
     CCP, // constant comparison propagation
     REGALLOC,
+    LOWER_SHORT_CIRCUIT,    // Lower boolean && || operators to if blocks, used for testing and SON
     DUMP_INITIAL_IR,
     DUMP_PRE_SSA_DOMTREE,
     DUMP_PRE_SSA_DOMFRONTIERS,

@@ -9,6 +9,7 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.AST;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
 import com.compilerprogramming.ezlang.semantic.NullableAnalysis;
 import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
 import com.compilerprogramming.ezlang.semantic.SemaDefineTypes;
@@ -82,12 +83,24 @@ public class Compiler {
     public TypeDictionary createAST(String src) {
         Parser parser = new Parser();
         var program = parser.parse(new Lexer(src));
+        analyze(program);
+        // Lower boolean && and || to if blocks after nullable analysis has seen the original guards.
+        ShortCircuitLowerer.lower(program);
+        return bind(program);
+    }
+
+    private TypeDictionary analyze(AST.Program program) {
+        var typeDict = bind(program);
+        NullableAnalysis.analyze(typeDict);
+        return typeDict;
+    }
+
+    private TypeDictionary bind(AST.Program program) {
         var typeDict = new TypeDictionary();
         var sema = new SemaDefineTypes(typeDict);
         sema.analyze(program);
         var sema2 = new SemaAssignTypes(typeDict);
         sema2.analyze(program);
-        NullableAnalysis.analyze(typeDict);
         return typeDict;
     }
 
@@ -220,6 +233,8 @@ public class Compiler {
             // A reference to array in EeZee means
             // *array in SoN
             Type elementType = getSONType(structTypes,typeArray.getElementType());
+            if (elementType instanceof TypeMemPtr ptr && ptr.notNull())
+                throw new CompilerException("Array element reference types must be nullable", -1);
             TypeStruct ts = TypeStruct.makeArray(TypeInteger.U32, _code.getALIAS(), elementType, _code.getALIAS());
             TypeMemPtr ptr = TypeMemPtr.make((byte)2,ts);
             structTypes.put(typeArray.name(), ptr); // Array type name is not same as ptr str()
@@ -530,6 +545,10 @@ public class Compiler {
         Type tf = f._type;
         Node mem = memAlias(f._alias);
         Node st = new StoreNode(f._fname,f._alias,tf,mem,objPtr,off.unkeep(),val.unkeep(),true).peephole();
+        // Arrays include control, as a proxy for a safety range check
+        // Structs don't need this; they only need a NPE check which is
+        // done via the type system.
+        st.setDef(0,ctrl());
         memAlias(f._alias,st);
         return objPtr;
     }
@@ -629,6 +648,8 @@ public class Compiler {
         switch (opCode) {
             case "&&":
             case "||":
+                // We should never reach here because the AST is lowered such that these ops
+                // have been replaced by standard if blocks.
                 throw new CompilerException("Not yet implemented", binaryExpr.lineNumber);
             case "==":
                 idx=2;  lhs = binaryExpr.expr1.type instanceof EZType.EZTypeFloat ? new BoolNode.EQF(lhs, null) : new BoolNode.EQ(lhs, null);
