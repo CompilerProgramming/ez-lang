@@ -9,7 +9,6 @@ public class IfNode extends CFGNode implements MultiNode {
 
     public IfNode(Node ctrl, Node pred) {
         super(ctrl, pred);
-        CodeGen.CODE.add(this); // Because idoms are complex, just add it
     }
     public IfNode(IfNode iff) { super(iff); }
 

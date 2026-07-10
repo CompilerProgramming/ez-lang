@@ -364,9 +364,13 @@ public class Compiler {
         // Parse the body
         Node last = compileStatement(funcDecl.block);
 
-        // Last expression is the return
-        if( ctrl()._type== Type.CONTROL )
-            fun.addReturn(ctrl(), _scope.mem().merge(), last);
+        // Add an implicit return only for reachable fall-through. Void functions
+        // use an integer sentinel in the backend signature.
+        if( ctrl()._type== Type.CONTROL ) {
+            EZType.EZTypeFunction functionType = (EZType.EZTypeFunction) functionTypeSymbol.type;
+            Node result = functionType.returnType instanceof EZType.EZTypeVoid ? ZERO : last;
+            fun.addReturn(ctrl(), _scope.mem().merge(), result);
+        }
 
         // Pop off the inProgress node on the multi-exit Region merge
         assert r.inProgress();

@@ -65,7 +65,6 @@ public class FunNode extends RegionNode {
     public void setSig( TypeFunPtr sig ) {
         assert sig.isa(_sig);
         if( _sig != sig ) {
-            CODE.add(this);
             _sig = sig;
         }
     }
@@ -89,8 +88,6 @@ public class FunNode extends RegionNode {
         // Some linked path dies
         Node progress = deadPath();
         if( progress!=null ) {
-            if( nIns()==3 && in(2) instanceof CallNode call )
-                CODE.add(call.cend()); // If Start and one call, check for inline
             return progress;
         }
 
@@ -114,8 +111,6 @@ public class FunNode extends RegionNode {
 
         // If down to a single input, become that input
         if( nIns()==2 && !hasPhi() ) {
-            CODE.add( CODE._stop ); // Stop will remove dead path
-            CODE.add( _ret );       // Return will compute to TOP control
             return in(1); // Collapse if no Phis; 1-input Phis will collapse on their own
         }
 

@@ -1008,7 +1008,7 @@ func quicksort(arr: [Float], low: Int, high: Int) {
     }
 }
 
-func eq(a: [Int], b: [Int], n: Int)->Int
+func eq(a: [Float], b: [Float], n: Int)->Int
 {
     var result = 1
     var i = 0

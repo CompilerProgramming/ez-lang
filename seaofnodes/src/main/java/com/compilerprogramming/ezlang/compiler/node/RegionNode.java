@@ -64,7 +64,6 @@ public class RegionNode extends CFGNode {
                             PhiNode phi2 = phi.in(i) instanceof PhiNode phi2x && phi2x.region()==region ? phi2x : null;
                             for( int j=1; j<region.nIns(); j++ )
                                 phi.addDef(phi2==null ? phi.in(i) : phi2.in(j));
-                            CodeGen.CODE.add(phi);
                         }
                     }
 
@@ -98,7 +97,7 @@ public class RegionNode extends CFGNode {
             nouts = nOuts();
             for( int i=0; i<nOuts(); i++ )
                 if( out(i) instanceof PhiNode phi && phi.nIns()==nIns() )
-                    CodeGen.CODE.addAll(phi.delDef(path)._outputs);
+                    phi.delDef(path);
         }
         return isDead() ? Compiler.XCTRL : delDef(path);
     }
