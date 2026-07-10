@@ -1,6 +1,7 @@
 package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.compiler.codegen.CodeGen;
+import com.compilerprogramming.ezlang.compiler.node.cpus.riscv.riscv;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
 import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
@@ -8,6 +9,8 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import java.io.IOException;
 
 import static com.compilerprogramming.ezlang.compiler.Main.PORTS;
 import static org.junit.Assert.assertEquals;
@@ -360,5 +363,14 @@ func foo(a: Int, b: Int)->Int {
                     return 42
                 }
                 """, 0, null);
+    }
+
+    @Test
+    public void testMergeSortUsingRisc5Emulator() throws IOException {
+        EvalRisc5 R5 = TestRisc5.build("src/test/cases/mergsort", "sort", "main", 0, 36, false);
+        int trap = R5.step(100000);
+        assertEquals(0,trap);
+        assertEquals(1L, R5.regs[riscv.A0]);
+
     }
 }
