@@ -1100,6 +1100,78 @@ func main()->Int
     }
 
     @Test
+    public void testFunction110ReducedPartition() throws IOException {
+        String src = """
+func swap(arr: [Int], i: Int, j: Int) {
+    var tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+}
+
+func partition(arr: [Int], low: Int, high: Int)->Int {
+    var pivot = arr[high];
+    var i = low;
+    var j = low;
+    while (j < high) {
+        if (arr[j] < pivot) {
+            swap(arr, i, j);
+            i = i + 1;
+        }
+        j = j + 1;
+    }
+    swap(arr, i, high);
+    return i;
+}
+
+func main()->Int {
+    var nums = new [Int]{33, 10, 55, 71, 29, 3};
+    return partition(nums, 0, 4);
+}
+""";
+        runRisc5(src, "main", 1L);
+    }
+    @Test
+    @Ignore("RISC5 backend corrupts recursive quicksort execution")
+    public void testFunction110ReducedRecursive() throws IOException {
+        String src = """
+func swap(arr: [Int], i: Int, j: Int) {
+    var tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+}
+
+func partition(arr: [Int], low: Int, high: Int)->Int {
+    var pivot = arr[high];
+    var i = low;
+    var j = low;
+    while (j < high) {
+        if (arr[j] < pivot) {
+            swap(arr, i, j);
+            i = i + 1;
+        }
+        j = j + 1;
+    }
+    swap(arr, i, high);
+    return i;
+}
+
+func quicksort(arr: [Int], low: Int, high: Int) {
+    if (low < high) {
+        var p = partition(arr, low, high);
+        quicksort(arr, low, p - 1);
+        quicksort(arr, p + 1, high);
+    }
+}
+
+func main()->Int {
+    var nums = new [Int]{33, 10, 55, 71, 29, 3};
+    quicksort(nums, 0, 5);
+    return nums[0] * 100 + nums[5];
+}
+""";
+        runRisc5(src, "main", 371L);
+    }
+    @Test
     public void testNullPhiThroughSSADestruction() throws IOException {
         String src = """
                 struct Foo
