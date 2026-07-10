@@ -371,6 +371,21 @@ func foo(a: Int, b: Int)->Int {
         int trap = R5.step(100000);
         assertEquals(0,trap);
         assertEquals(1L, R5.regs[riscv.A0]);
+    }
 
+    @Test
+    public void testFibUsingRisc5Emulator() throws IOException {
+        EvalRisc5 R5 = TestRisc5.build("src/test/cases/fib", "fib", "foo", 0, 36, false);
+        int trap = R5.step(100000);
+        assertEquals(0,trap);
+        assertEquals(89L, R5.regs[riscv.A0]);
+    }
+
+    @Test
+    public void testSieveUsingRisc5Emulator() throws IOException {
+        EvalRisc5 R5 = TestRisc5.build("src/test/cases/sieve", "sieve", "main", 0, 36, false);
+        int trap = R5.step(100000);
+        assertEquals(0,trap);
+        assertEquals(1L, R5.regs[riscv.A0]);
     }
 }
