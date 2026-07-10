@@ -16,16 +16,21 @@ public class TestRisc5 {
 
     // Compile and run a simple program
     public static EvalRisc5 build( String dir, String file, String main, int arg, int spills, boolean print ) throws IOException {
-        // Compile and export Simple
         String src = Files.readString(Path.of(dir+"/"+file+".ez"));
+        return buildSrc(src, main, arg, spills, print);
+    }
+
+    public static EvalRisc5 buildSrc( String src, String main, int arg, int spills, boolean print ) throws IOException {
+        // Compile and export Simple
         CodeGen code = new CodeGen(src).driver("riscv", "SystemV",null);
         if( print ) { code.print_as_hex(); System.out.print(code.asm()); }
 
-        // Allocation quality not degraded
-        int delta = spills>>3;
-        if( delta==0 ) delta = 1;
-        if( spills != -1 )
+        // Allocation quality not degraded when a baseline was supplied
+        if( spills >= 0 ) {
+            int delta = spills>>3;
+            if( delta==0 ) delta = 1;
             assertEquals("Expect spills:",spills,code._regAlloc._spillScaled,delta);
+        }
 
         // Image
         byte[] image = new byte[1<<20]; // A megabyte (1024*1024 bytes)
