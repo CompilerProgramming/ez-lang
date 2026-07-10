@@ -453,7 +453,7 @@ public class TestSemaAssignTypes {
     }
 
     // Nullable Bug call should fail
-    @Test
+    @Test(expected = CompilerException.class)
     public void test25() {
         String src = """
     struct Foo { var bar: Int }
@@ -528,5 +528,17 @@ public class TestSemaAssignTypes {
     }
 """;
         analyze(src, "foo", "func foo()->Int");
+    }
+    @Test(expected = CompilerException.class)
+    public void testCallRejectsMismatchedArrayElementType() {
+        String src = """
+    func eq(a: [Int]) {
+    }
+    func main() {
+        var values = new [Float] {1.0, 2.0}
+        eq(values)
+    }
+""";
+        analyze(src, "main", "func main()");
     }
 }

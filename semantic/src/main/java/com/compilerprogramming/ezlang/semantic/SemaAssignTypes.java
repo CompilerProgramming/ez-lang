@@ -179,6 +179,13 @@ public class SemaAssignTypes implements ASTVisitor {
             return;
         validType(callExpr.callee.type, false, callExpr.lineNumber);
         if (callExpr.callee.type instanceof EZType.EZTypeFunction f) {
+            if (callExpr.args.size() != f.args.size())
+                throw new CompilerException("Expected " + f.args.size() + " arguments but got " + callExpr.args.size(), callExpr.lineNumber);
+            for (int i = 0; i < callExpr.args.size(); i++) {
+                EZType argumentType = callExpr.args.get(i).type;
+                validType(argumentType, true, callExpr.lineNumber);
+                checkAssignmentCompatible(f.args.get(i).type, argumentType, callExpr.lineNumber);
+            }
             callExpr.type = f.returnType;
         }
         else
