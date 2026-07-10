@@ -60,7 +60,7 @@ public class Compiler {
     // Mapping from a type name to a Type.  The string name matches
     // `type.str()` call.  No TypeMemPtrs are in here, because Simple does not
     // have C-style '*ptr' references.
-    public static HashMap<String, Type> TYPES = new HashMap<>();
+    private final HashMap<String, Type> types = new HashMap<>();
 
     private ArrayList<Node> ctorStack = new ArrayList<>();
 
@@ -70,10 +70,9 @@ public class Compiler {
 
     public void parse() {
         this.typeDictionary = createAST(_code._src);
-        Map<String, Type> types = new HashMap<>();
+        types.clear();
         populateDefaultTypes(types);
         populateTypes(types);
-        TYPES.putAll(types);
         ZERO  = con(TypeInteger.ZERO).keep();
         NIL  = con(Type.NIL).keep();
         XCTRL= new XCtrlNode().peephole().keep();
@@ -269,7 +268,7 @@ public class Compiler {
         for (Symbol symbol: scope.getLocalSymbols()) {
             if (symbol instanceof Symbol.VarSymbol varSymbol) {
                 varSymbol.regNumber = REGNUM++;
-                Type sonType = TYPES.get(varSymbol.type.name());
+                Type sonType = types.get(varSymbol.type.name());
                 if (sonType == null)
                     throw new CompilerException("Unknown SON Type "+varSymbol.type.name());
                 Node init = null;
@@ -290,7 +289,7 @@ public class Compiler {
         ctrl(XCTRL);
         _scope.mem(new MemMergeNode(false));
 
-        var funType = (TypeFunPtr) TYPES.get(functionTypeSymbol.name);
+        var funType = (TypeFunPtr) types.get(functionTypeSymbol.name);
         if (funType == null) throw new CompilerException("Function " + functionTypeSymbol.name + " not found");
 
         // Parse whole program, as-if function header "{ int arg -> body }"
@@ -612,11 +611,11 @@ public class Compiler {
     private Node compileNewExpr(AST.NewExpr newExpr) {
         EZType type = newExpr.type;
         if (type instanceof EZType.EZTypeArray typeArray) {
-            TypeMemPtr tarray = (TypeMemPtr) TYPES.get(typeArray.name());
+            TypeMemPtr tarray = (TypeMemPtr) types.get(typeArray.name());
             return newArray(tarray._obj,newExpr.len==null?ZERO:compileExpr(newExpr.len));
         }
         else if (type instanceof EZType.EZTypeStruct typeStruct) {
-            TypeMemPtr tptr = (TypeMemPtr) TYPES.get(typeStruct.name());
+            TypeMemPtr tptr = (TypeMemPtr) types.get(typeStruct.name());
             return newStruct(tptr._obj,con(tptr._obj.offset(tptr._obj._fields.length)));
         }
         else
@@ -703,7 +702,7 @@ public class Compiler {
 
     private Node compileSymbolExpr(AST.NameExpr symbolExpr) {
         if (symbolExpr.type instanceof EZType.EZTypeFunction functionType)
-            return con(TYPES.get(functionType.name));
+            return con(types.get(functionType.name));
         else {
             Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) symbolExpr.symbol;
             Var v = _scope.lookup(makeVarName(varSymbol));

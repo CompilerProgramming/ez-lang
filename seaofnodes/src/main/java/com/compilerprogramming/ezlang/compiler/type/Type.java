@@ -81,6 +81,24 @@ public class Type {
         return ts.toArray(new Type[ts.size()]);
     }
 
+    private static HashMap<Type, Type> INTERN_BASELINE;
+
+    /**
+     * Call this at the start of each front-end compilation
+     * run to reset the intern table to core types that the SoN backend
+     * needs. The reset drops any types added by a previous
+     * compile run.
+     */
+    public static void resetInternTable() {
+        if( INTERN_BASELINE == null ) {
+            gather();
+            INTERN_BASELINE = new HashMap<>(INTERN);
+        } else {
+            INTERN.clear();
+            INTERN.putAll(INTERN_BASELINE);
+        }
+    }
+
     // Is high or on the lattice centerline.
     public boolean isHigh       () { return _type==TTOP || _type==TXCTRL || _type==TXNIL; }
     public boolean isHighOrConst() { return isHigh() || isConstant(); }

@@ -43,6 +43,7 @@ public class CodeGen {
     // ---------------------------
     public CodeGen( String src ) { this(src, TypeInteger.BOT, 123L ); }
     public CodeGen( String src, TypeInteger arg, long workListSeed ) {
+        Type.resetInternTable();
         CODE = this;
         _phase = null;
         _callingConv = null;
@@ -51,6 +52,7 @@ public class CodeGen {
         _src = src;
         _arg = arg;
         _iter = new IterPeeps(workListSeed);
+        _main = makeFun(TypeTuple.MAIN, Type.BOTTOM);
         P = new Compiler(this,arg);
     }
 
@@ -141,7 +143,7 @@ public class CodeGen {
         return new TypeFunPtr((byte)2,sig,ret, 1L<<fidx );
     }
     // Signature for MAIN
-    public TypeFunPtr _main = makeFun(TypeTuple.MAIN, Type.BOTTOM);
+    public TypeFunPtr _main;
     // Reverse from a constant function pointer to the IR function being called
     public FunNode link( TypeFunPtr tfp ) {
         assert tfp.isConstant();
