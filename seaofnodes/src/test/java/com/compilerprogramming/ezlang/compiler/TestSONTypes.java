@@ -1040,7 +1040,6 @@ func main()->Int
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction110() throws IOException {
         String src = """
 func swap(arr: [Int], i: Int, j: Int) {
@@ -1100,6 +1099,66 @@ func main()->Int
     }
 
     @Test
+    public void testRecursiveTwoCallsWithLiveValues() throws IOException {
+        String src = """
+func recurse(low: Int, high: Int)->Int {
+    if (low < high) {
+        var p = low;
+        recurse(low, p - 1);
+        return recurse(p + 1, high);
+    }
+    return 1;
+}
+
+func main()->Int {
+    return recurse(0, 5);
+}
+""";
+        runRisc5(src, "main", 1L);
+    }
+    @Test
+    public void testRecursiveTwoCallsWithArrayArgument() throws IOException {
+        String src = """
+func recurse(arr: [Int], low: Int, high: Int)->Int {
+    if (low < high) {
+        var p = low;
+        recurse(arr, low, p - 1);
+        return recurse(arr, p + 1, high);
+    }
+    return 1;
+}
+
+func main()->Int {
+    var nums = new [Int]{33, 10, 55, 71, 29, 3};
+    return recurse(nums, 0, 5);
+}
+""";
+        runRisc5(src, "main", 1L);
+    }
+    @Test
+    public void testRecursiveTwoCallsWithComputedPivot() throws IOException {
+        String src = """
+func choosePivot(arr: [Int], low: Int, high: Int)->Int {
+    return low;
+}
+
+func recurse(arr: [Int], low: Int, high: Int)->Int {
+    if (low < high) {
+        var p = choosePivot(arr, low, high);
+        recurse(arr, low, p - 1);
+        return recurse(arr, p + 1, high);
+    }
+    return 1;
+}
+
+func main()->Int {
+    var nums = new [Int]{33, 10, 55, 71, 29, 3};
+    return recurse(nums, 0, 5);
+}
+""";
+        runRisc5(src, "main", 1L);
+    }
+    @Test
     public void testFunction110ReducedPartition() throws IOException {
         String src = """
 func swap(arr: [Int], i: Int, j: Int) {
@@ -1131,7 +1190,6 @@ func main()->Int {
         runRisc5(src, "main", 1L);
     }
     @Test
-    @Ignore("RISC5 backend corrupts recursive quicksort execution")
     public void testFunction110ReducedRecursive() throws IOException {
         String src = """
 func swap(arr: [Int], i: Int, j: Int) {
