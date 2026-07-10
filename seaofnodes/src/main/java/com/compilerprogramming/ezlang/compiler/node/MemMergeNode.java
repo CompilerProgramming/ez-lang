@@ -163,7 +163,6 @@ public class MemMergeNode extends Node {
             if( in(i) instanceof PhiNode phi ) {
                 // Do an eager useless-phi removal
                 Node in = phi.peephole();
-                CodeGen.CODE.addAll(phi._outputs);
                 phi.moveDepsToWorklist();
                 if( in != phi ) {
                     if( !phi.iskeep() ) // Keeping phi around for parser elsewhere

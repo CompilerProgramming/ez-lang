@@ -129,7 +129,7 @@ public class CallNode extends CFGNode {
             if( use instanceof ParmNode parm )
                 parm.addDef(parm._idx==0 ? new ConstantNode(cend()._rpc).peephole() : arg(parm._idx));
         // Call end points to function return
-        CodeGen.CODE.add(cend()).addDef(fun.ret());
+        cend().addDef(fun.ret());
         return this;
     }
 

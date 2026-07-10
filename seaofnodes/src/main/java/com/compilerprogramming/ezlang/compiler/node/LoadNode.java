@@ -64,9 +64,6 @@ public class LoadNode extends MemOpNode {
         // Simple load-after-MemMerge to a known alias can bypass.  Happens when inlining.
         if( mem instanceof MemMergeNode mem2 ) {
             Node memA = mem2.alias(_alias);
-            for( Node ld : memA._outputs )
-                if( ld instanceof LoadNode )
-                    CodeGen.CODE.add(ld);
             setDef(1,memA);
             return this;
         }

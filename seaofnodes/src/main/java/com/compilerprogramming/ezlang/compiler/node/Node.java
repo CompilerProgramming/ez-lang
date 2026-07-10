@@ -178,7 +178,6 @@ public abstract class Node implements Cloneable {
         if( old_def != null ) {        // If the old def exists, remove a def->use edge
             if( old_def.delUse(this) ) // If we removed the last use, the old def is now dead
                 old_def.kill();        // Kill old def
-            else CODE.add(old_def);    // Else old lost a use, so onto worklist
         }
         moveDepsToWorklist();
         // Return new_def for easy flow-coding
@@ -264,7 +263,7 @@ public abstract class Node implements Cloneable {
         while( nIns()>0 ) { // Set all inputs to null, recursively killing unused Nodes
             Node old_def = _inputs.removeLast();
             // Revisit neighbor because removed use
-            if( old_def != null && CODE.add(old_def).delUse(this) )
+            if( old_def != null && old_def.delUse(this) )
                 old_def.kill(); // If we removed the last use, the old def is now dead
         }
         assert isDead();        // Really dead now
@@ -312,8 +311,6 @@ public abstract class Node implements Cloneable {
             int idx = n._inputs.find(this);
             n._inputs.set(idx,nnn);
             nnn.addUse(n);
-            CODE.add(n);
-            CODE.addAll(n._outputs);
         }
         kill();
     }
@@ -488,7 +485,6 @@ public abstract class Node implements Cloneable {
         assert old==null || type.isa(old); // Since _type not set, can just re-run this in assert in the debugger
         if( old == type ) return old;
         _type = type;       // Set _type late for easier assert debugging
-        CODE.addAll(_outputs);
         moveDepsToWorklist();
         return old;
     }
@@ -571,7 +567,6 @@ public abstract class Node implements Cloneable {
     // Move the dependents onto a worklist, and clear for future dependents.
     public void moveDepsToWorklist( ) {
         if( _deps==null ) return;
-        CODE.addAll(_deps);
         _deps.clear();
     }
 

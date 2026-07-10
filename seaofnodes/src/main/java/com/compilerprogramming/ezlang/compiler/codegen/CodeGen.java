@@ -51,7 +51,6 @@ public class CodeGen {
         _stop = new StopNode(src);
         _src = src;
         _arg = arg;
-        //_iter = new IterPeeps(workListSeed);
         _iter = new IterPeeps2();
         _main = makeFun(TypeTuple.MAIN, Type.BOTTOM);
         P = new Compiler(this,arg);
@@ -207,8 +206,6 @@ public class CodeGen {
         // loop unroll, peel, RCE, etc
         return this;
     }
-    public <N extends Node> N add( N n ) { /* return _iter.add(n); */ return n; }
-    public void addAll( Ary<Node> ary ) { /* _iter.addAll(ary); */ }
 
 
     // ---------------------------
