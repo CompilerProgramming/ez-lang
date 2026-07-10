@@ -367,7 +367,7 @@ func foo(a: Int, b: Int)->Int {
 
     @Test
     public void testMergeSortUsingRisc5Emulator() throws IOException {
-        EvalRisc5 R5 = TestRisc5.build("src/test/cases/mergsort", "sort", "main", 0, 36, false);
+        EvalRisc5 R5 = TestRisc5.build("src/test/cases/mergsort", "sort", "main", 0, 59, false);
         int trap = R5.step(100000);
         assertEquals(0,trap);
         assertEquals(1L, R5.regs[riscv.A0]);
@@ -375,7 +375,7 @@ func foo(a: Int, b: Int)->Int {
 
     @Test
     public void testFibUsingRisc5Emulator() throws IOException {
-        EvalRisc5 R5 = TestRisc5.build("src/test/cases/fib", "fib", "foo", 0, 36, false);
+        EvalRisc5 R5 = TestRisc5.build("src/test/cases/fib", "fib", "foo", 0, 19, false);
         int trap = R5.step(100000);
         assertEquals(0,trap);
         assertEquals(89L, R5.regs[riscv.A0]);
@@ -383,7 +383,7 @@ func foo(a: Int, b: Int)->Int {
 
     @Test
     public void testSieveUsingRisc5Emulator() throws IOException {
-        EvalRisc5 R5 = TestRisc5.build("src/test/cases/sieve", "sieve", "main", 0, 36, false);
+        EvalRisc5 R5 = TestRisc5.build("src/test/cases/sieve", "sieve", "main", 0, 106, false);
         int trap = R5.step(100000);
         assertEquals(0,trap);
         assertEquals(1L, R5.regs[riscv.A0]);
