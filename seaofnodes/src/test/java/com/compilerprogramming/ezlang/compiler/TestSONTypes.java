@@ -1,6 +1,7 @@
 package com.compilerprogramming.ezlang.compiler;
 
 import com.compilerprogramming.ezlang.compiler.codegen.CodeGen;
+import com.compilerprogramming.ezlang.compiler.node.cpus.arm.arm;
 import com.compilerprogramming.ezlang.compiler.node.cpus.riscv.riscv;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
@@ -389,6 +390,40 @@ func foo(a: Int, b: Int)->Int {
         assertEquals(1L, R5.regs[riscv.A0]);
     }
 
+    @Test
+    public void testFibUsingArm64Emulator() throws IOException {
+        EvalArm64 A64 = TestArm64.build("src/test/cases/fib", "fib", "foo", 0, -1, false);
+        int trap = A64.step(100000);
+        assertEquals(0,trap);
+        assertEquals(89L, A64.regs[arm.X0]);
+    }
+
+    @Test
+    public void testSieveUsingArm64Emulator() throws IOException {
+        EvalArm64 A64 = TestArm64.build("src/test/cases/sieve", "sieve", "main", 0, -1, false);
+        int trap = A64.step(100000);
+        assertEquals(0,trap);
+        assertEquals(1L, A64.regs[arm.X0]);
+    }
+
+    @Test
+    public void testMergeSortUsingArm64Emulator() throws IOException {
+        EvalArm64 A64 = TestArm64.build("src/test/cases/mergsort", "sort", "main", 0, -1, false);
+        int trap = A64.step(100000);
+        assertEquals(0,trap);
+        assertEquals(1L, A64.regs[arm.X0]);
+    }
+
+    private static void runArm64(String src, String entry, long expected) throws IOException {
+        EvalArm64 arm64 = TestArm64.buildSrc(src, entry, 0, -1, false);
+        assertEquals(0, arm64.step(1_000_000));
+        assertEquals(expected, arm64.regs[arm.X0]);
+    }
+    // Run on every CPU port we have an emulator for
+    private static void runEmulators(String src, String entry, long expected) throws IOException {
+        runRisc5(src, entry, expected);
+        runArm64(src, entry, expected);
+    }
     private static void runRisc5(String src, String entry, long expected) throws IOException {
         EvalRisc5 risc5 = TestRisc5.buildSrc(src, entry, 0, -1, false);
         assertEquals(0, risc5.step(1_000_000));
@@ -401,7 +436,7 @@ func foo(a: Int, b: Int)->Int {
                     return 42;
                 }
                 """;
-        runRisc5(src, "foo", 42L);
+        runEmulators(src, "foo", 42L);
     }
 
     @Test
@@ -414,7 +449,7 @@ func foo(a: Int, b: Int)->Int {
                     return bar();
                 }
                 """;
-        runRisc5(src, "foo", 42L);
+        runEmulators(src, "foo", 42L);
     }
 
     @Test
@@ -428,7 +463,7 @@ func foo(a: Int, b: Int)->Int {
                     return negate(42);
                 }
                 """;
-        runRisc5(src, "foo", -42L);
+        runEmulators(src, "foo", -42L);
     }
 
     @Test
@@ -437,7 +472,7 @@ func foo(a: Int, b: Int)->Int {
                 func foo(x: Int, y: Int)->Int { return x+y; }
                 func bar()->Int { var t = foo(1,2); return t+1; }
                 """;
-        runRisc5(src, "bar", 4L);
+        runEmulators(src, "bar", 4L);
     }
 
     @Test
@@ -445,7 +480,7 @@ func foo(a: Int, b: Int)->Int {
         String src = """
                 func bar()->Int { var t = new [Int] {1,21,3}; return t[1]; }
                 """;
-        runRisc5(src, "bar", 21L);
+        runEmulators(src, "bar", 21L);
     }
 
     @Test
@@ -462,7 +497,7 @@ func foo(a: Int, b: Int)->Int {
                 }
                 func bar()->Int { return foo().field }
                 """;
-        runRisc5(src, "bar", 42L);
+        runEmulators(src, "bar", 42L);
     }
 
     @Test
@@ -477,7 +512,7 @@ func foo(a: Int, b: Int)->Int {
                     return bar(1);
                 }
                 """;
-        runRisc5(src, "foo", 42L);
+        runEmulators(src, "foo", 42L);
     }
 
     @Test
@@ -496,7 +531,7 @@ func foo(a: Int, b: Int)->Int {
                     return factorial(5);
                 }
                 """;
-        runRisc5(src, "foo", 120L);
+        runEmulators(src, "foo", 120L);
     }
 
     @Test
@@ -518,7 +553,7 @@ func foo(a: Int, b: Int)->Int {
                     return fib(10)
                 }
                 """;
-        runRisc5(src, "foo", 89L);
+        runEmulators(src, "foo", 89L);
     }
 
     @Test
@@ -530,7 +565,7 @@ func foo(a: Int, b: Int)->Int {
                     return 3;
                 }
                 """;
-        runRisc5(src, "foo", 2L);
+        runEmulators(src, "foo", 2L);
     }
 
     @Test
@@ -551,7 +586,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]
                 }
                 """;
-        runRisc5(src, "foo", 9L);
+        runEmulators(src, "foo", 9L);
     }
 
     @Test
@@ -571,7 +606,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2];
                 }
                 """;
-        runRisc5(src, "foo", 12478L);
+        runEmulators(src, "foo", 12478L);
     }
 
     @Test
@@ -591,7 +626,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2];
                 }
                 """;
-        runRisc5(src, "foo", -12212L);
+        runEmulators(src, "foo", -12212L);
     }
 
     @Test
@@ -612,7 +647,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3];
                 }
                 """;
-        runRisc5(src, "foo", 5L);
+        runEmulators(src, "foo", 5L);
     }
 
     @Test
@@ -633,7 +668,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3];
                 }
                 """;
-        runRisc5(src, "foo", 5L);
+        runEmulators(src, "foo", 5L);
     }
 
     @Test
@@ -658,7 +693,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3]
                 }
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -686,7 +721,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3]
                 }
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -711,7 +746,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2];
                 }
                 """;
-        runRisc5(src, "foo", 2L);
+        runEmulators(src, "foo", 2L);
     }
 
     @Test
@@ -730,7 +765,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1];
                 }
                 """;
-        runRisc5(src, "foo", 213L);
+        runEmulators(src, "foo", 213L);
     }
 
     @Test
@@ -749,7 +784,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1];
                 }
                 """;
-        runRisc5(src, "foo", 5L);
+        runEmulators(src, "foo", 5L);
     }
 
     @Test
@@ -761,7 +796,7 @@ func foo(a: Int, b: Int)->Int {
                 }
 
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -779,7 +814,7 @@ func foo(a: Int, b: Int)->Int {
                 }
 
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -797,7 +832,7 @@ func foo(a: Int, b: Int)->Int {
                 }
 
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -809,7 +844,7 @@ func foo(a: Int, b: Int)->Int {
                 }
 
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -824,7 +859,7 @@ func foo(a: Int, b: Int)->Int {
                     return bar(3,5)
                 }
                 """;
-        runRisc5(src, "foo", 0L);
+        runEmulators(src, "foo", 0L);
     }
 
     @Test
@@ -839,7 +874,7 @@ func foo(a: Int, b: Int)->Int {
                     return bar(3,5)
                 }
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -854,7 +889,7 @@ func foo(a: Int, b: Int)->Int {
                     return bar(new [Int] {3,5,1})
                 }
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -939,7 +974,7 @@ func main()->Int
     return eq(a,expect,10)
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
 
     @Test
@@ -962,7 +997,7 @@ func main()->Int
                     return 0
                 }
                 """;
-        runRisc5(src, "main", 0L);
+        runEmulators(src, "main", 0L);
     }
 
     @Test
@@ -1036,7 +1071,7 @@ func main()->Int
     return eq(rez,expected,8)
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
 
     @Test
@@ -1095,7 +1130,7 @@ func main()->Int
     return eq(nums,expected,6)
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
 
     @Test
@@ -1114,7 +1149,7 @@ func main()->Int {
     return recurse(0, 5);
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
     @Test
     public void testRecursiveTwoCallsWithArrayArgument() throws IOException {
@@ -1133,7 +1168,7 @@ func main()->Int {
     return recurse(nums, 0, 5);
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
     @Test
     public void testRecursiveTwoCallsWithComputedPivot() throws IOException {
@@ -1156,7 +1191,7 @@ func main()->Int {
     return recurse(nums, 0, 5);
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
     @Test
     public void testFunction110ReducedPartition() throws IOException {
@@ -1187,7 +1222,7 @@ func main()->Int {
     return partition(nums, 0, 4);
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
     @Test
     public void testFunction110ReducedRecursive() throws IOException {
@@ -1227,7 +1262,7 @@ func main()->Int {
     return nums[0] * 100 + nums[5];
 }
 """;
-        runRisc5(src, "main", 371L);
+        runEmulators(src, "main", 371L);
     }
     @Test
     public void testNullPhiThroughSSADestruction() throws IOException {
@@ -1247,7 +1282,7 @@ func main()->Int {
                     return choose(0) == null && choose(1) != null
                 }
                 """;
-        runRisc5(src, "foo", 1L);
+        runEmulators(src, "foo", 1L);
     }
 
     @Test
@@ -1307,7 +1342,7 @@ func main()->Int
     return eq(nums,expected,6)
 }
 """;
-        runRisc5(src, "main", 1L);
+        runEmulators(src, "main", 1L);
     }
 
     @Test
@@ -1319,7 +1354,7 @@ func main()->Int
                     return #a + #b
                 }
                 """;
-        runRisc5(src, "foo", 4L);
+        runEmulators(src, "foo", 4L);
     }
 
 }
