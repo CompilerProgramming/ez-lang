@@ -209,6 +209,17 @@ public class EvalRisc5 {
                     }
                     break;
                 }
+                case 0x27: { // FSW/FSD
+                    int rs1=(int)regs[(ir >>> 15)&31], rs2=(ir >>> 20)&31;
+                    int addr=rs1+((ir >> 25)<<5)+((ir >>> 7)&31);
+                    switch((ir >>> 12)&7) {
+                        case 2: st4(addr,Float.floatToRawIntBits((float)fregs[rs2])); break;
+                        case 3: st8(addr,Double.doubleToRawLongBits(fregs[rs2])); break;
+                        default: trap=3;
+                    }
+                    rdid=0;
+                    break;
+                }
                 case 0x13:   // Op-immediate 0b0010011
                 case 0x33: { // Op           0b0110011
                     int imm = ir >> 20;
@@ -314,8 +325,8 @@ public class EvalRisc5 {
                             is_f = false; // Output into a GPR
                             rval = switch( (ir >> 12) & 7 ) {
                                 case 0 -> lhs <= rhs ? 1 : 0;
-                                case 1 -> lhs == rhs ? 1 : 0;
-                                case 2 -> lhs <  rhs ? 1 : 0;
+                                case 1 -> lhs <  rhs ? 1 : 0;
+                                case 2 -> lhs == rhs ? 1 : 0;
                                 default -> throw Utils.TODO();
                             };
                             break;

@@ -88,6 +88,10 @@ public class PhiNode extends Node {
         if( live != null ) {
             if( live._type.isa(_type) )
                 return live;
+            // Memory needs no upcast: a single-alias Phi whose only input is
+            // wider memory (e.g. all-memory) just becomes that memory.
+            if( _type instanceof TypeMem )
+                return live;
             // Keep the Phi upcast
             return new CastNode(_type,null,live);
         }

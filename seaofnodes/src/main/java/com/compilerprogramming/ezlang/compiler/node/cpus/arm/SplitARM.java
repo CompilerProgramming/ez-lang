@@ -25,16 +25,18 @@ public class SplitARM extends SplitNode {
                 throw Utils.TODO();
             }
             int off = enc._fun.computeStackOffset(enc._code,dst);
+            // FP registers need the SIMD/FP store opcode, not the GPR one
             if( srcX ) src -= arm.D_OFFSET;
-            enc.add4(arm.load_str_imm(arm.OP_STORE_IMM_64, off, arm.RSP, src, 8));
+            enc.add4(arm.load_str_imm(srcX ? arm.OPF_STORE_IMM_64 : arm.OP_STORE_IMM_64, off, arm.RSP, src, 8));
             return;
         }
 
         if(src >= arm.MAX_REG) {
             // Load from SP
             int off = enc._fun.computeStackOffset(enc._code,src);
+            // FP registers need the SIMD/FP load opcode, not the GPR one
             if( dstX ) dst -= arm.D_OFFSET;
-            enc.add4(arm.load_str_imm(arm.OP_LOAD_IMM_64, off, arm.RSP, dst, 8));
+            enc.add4(arm.load_str_imm(dstX ? arm.OPF_LOAD_IMM_64 : arm.OP_LOAD_IMM_64, off, arm.RSP, dst, 8));
             return;
         }
 

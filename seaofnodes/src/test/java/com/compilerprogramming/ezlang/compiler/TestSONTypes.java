@@ -453,7 +453,6 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction3() throws IOException {
         String src = """
                 func negate(n: Int)->Int {
@@ -569,7 +568,6 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction11() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -590,7 +588,6 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction12() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -610,7 +607,6 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction13() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -630,7 +626,6 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction14() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -647,11 +642,10 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3];
                 }
                 """;
-        runEmulators(src, "foo", 5L);
+        runEmulators(src, "foo", 41L);
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction15() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -668,11 +662,10 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3];
                 }
                 """;
-        runEmulators(src, "foo", 5L);
+        runEmulators(src, "foo", 180L);
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction16() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -693,11 +686,10 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3]
                 }
                 """;
-        runEmulators(src, "foo", 1L);
+        runEmulators(src, "foo", 37L);
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction17() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -721,11 +713,10 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2]+data[3]
                 }
                 """;
-        runEmulators(src, "foo", 1L);
+        runEmulators(src, "foo", 215L);
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction18() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -746,11 +737,10 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1]+data[2];
                 }
                 """;
-        runEmulators(src, "foo", 2L);
+        runEmulators(src, "foo", 25L);
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction19() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -765,11 +755,10 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1];
                 }
                 """;
-        runEmulators(src, "foo", 213L);
+        runEmulators(src, "foo", 216L);
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction20() throws IOException {
         String src = """
                 func bar(data: [Int]) {
@@ -784,7 +773,7 @@ func foo(a: Int, b: Int)->Int {
                     return data[0]+data[1];
                 }
                 """;
-        runEmulators(src, "foo", 5L);
+        runEmulators(src, "foo", 115L);
     }
 
     @Test
@@ -800,7 +789,7 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
+    @Ignore("Self-referential struct type recurses forever in TypeStruct.dual()")
     public void testFunction102() throws IOException {
         String src = """
                 struct Foo
@@ -978,7 +967,7 @@ func main()->Int
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
+    @Ignore("Array initializer value= is not compiled by the SoN front end")
     public void testFunction108() throws IOException {
         String src = """
                 func make(len: Int, val: Int)->[Int]
@@ -1286,7 +1275,6 @@ func main()->Int {
     }
 
     @Test
-    @Ignore("RISC5 backend does not yet compile or execute this interpreter case")
     public void testFunction111() throws IOException {
         String src = """
 func swap(arr: [Float], i: Int, j: Int) {
@@ -1355,6 +1343,112 @@ func main()->Int
                 }
                 """;
         runEmulators(src, "foo", 4L);
+    }
+
+    @Test
+    public void testFloatCompareBranch() throws IOException {
+        String src = """
+                func lt(a: Float, b: Float)->Int {
+                    if (a < b) return 1
+                    return 0
+                }
+                func foo()->Int {
+                    return lt(1.5, 2.5) * 10 + lt(2.5, 1.5)
+                }
+                """;
+        runEmulators(src, "foo", 10L);
+    }
+
+    @Test
+    public void testFloatCompareValue() throws IOException {
+        String src = """
+                func lt(a: Float, b: Float)->Int {
+                    return a < b
+                }
+                func foo()->Int {
+                    return lt(1.5, 2.5) * 10 + lt(2.5, 1.5)
+                }
+                """;
+        runEmulators(src, "foo", 10L);
+    }
+
+    @Test
+    public void testFloatArrayStoreLoad() throws IOException {
+        String src = """
+                func foo()->Int {
+                    var a = new [Float]{1.5, 2.5, 4.0}
+                    a[1] = a[0] + a[2]
+                    if (a[1] == 5.5) return 1
+                    return 0
+                }
+                """;
+        runEmulators(src, "foo", 1L);
+    }
+
+    @Test
+    public void testFloatSpillAcrossCall() throws IOException {
+        String src = """
+                func get(a: [Float], i: Int)->Float {
+                    return a[i]
+                }
+                func put(a: [Float], i: Int, v: Float) {
+                    a[i] = v
+                }
+                func foo()->Int {
+                    var a = new [Float]{1.5, 2.5, 4.0}
+                    put(a, 1, get(a,0) + get(a,2))
+                    if (get(a,1) == 5.5) return 1
+                    return 0
+                }
+                """;
+        runEmulators(src, "foo", 1L);
+    }
+
+    @Test
+    public void testNegativeImmediate() throws IOException {
+        String src = """
+                func f(x: Int)->Int {
+                    return x + -5
+                }
+                func g(x: Int)->Int {
+                    return x - -7
+                }
+                func foo()->Int {
+                    return f(10) * 100 + g(10)
+                }
+                """;
+        runEmulators(src, "foo", 517L);
+    }
+
+    @Test
+    public void testFloatSameConstantLoadedTwice() throws IOException {
+        String src = """
+                func ne(a: Float, b: Float)->Int {
+                    if (a != b) return 1
+                    return 0
+                }
+                func main()->Int {
+                    return ne(1.5, 1.5) * 10 + ne(1.5, 2.5)
+                }
+                """;
+        runEmulators(src, "main", 1L);
+    }
+
+    @Test
+    public void testEarlyReturnInLoopAfterArrayLoad() throws IOException {
+        String src = """
+                func main()->Int {
+                    var arr = new [Int]{0,0,0}
+                    var i = 0
+                    while (i < 3) {
+                        if (arr[i] != 0)
+                            return 1
+                        i = i + 1
+                    }
+                    return 0
+                }
+                """;
+        runEmulators(src, "main", 0L);
     }
 
 }

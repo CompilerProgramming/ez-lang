@@ -37,8 +37,9 @@ public class TFPARM extends ConstantNode implements MachNode, RIPRelSize {
             int base = opStart & ~0xFFF;
             delta = target-base;
             int adrp_delta = delta >> 12;
-            // patch upper 20 bits via adrp
-            enc.patch4(opStart, arm.adrp(1, adrp_delta & 0b11, 0b10000, adrp_delta >> 2, rpc));
+            // ADRP splits a signed page offset into two unsigned bit fields.
+            // Mask the high field too, including for an address below this PC.
+            enc.patch4(opStart, arm.adrp(1, adrp_delta & 0b11, 0b10000, (adrp_delta >> 2) & 0x7FFFF, rpc));
             // low 12 bits via add
             enc.patch4(opStart+4, arm.imm_inst_l(arm.OPI_ADD, delta & 0xfff, rpc));
         } else {

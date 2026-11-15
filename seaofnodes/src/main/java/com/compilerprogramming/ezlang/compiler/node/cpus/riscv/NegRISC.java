@@ -12,7 +12,8 @@ public class NegRISC extends MachConcreteNode implements MachNode {
     @Override public void encoding( Encoding enc ) {
         short dst = enc.reg(this );
         short src = enc.reg(in(1));
-        riscv.r_type(riscv.OP,dst,0,0,src,0x20);
+        // sub dst = zero - src
+        enc.add4(riscv.r_type(riscv.OP,dst,0,riscv.ZERO,src,0x20));
     }
     @Override public void asm(CodeGen code, SB sb) {
         sb.p(code.reg(this)).p(" = -").p(code.reg(in(1)));

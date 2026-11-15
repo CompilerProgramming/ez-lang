@@ -294,8 +294,9 @@ public class EvalArm64 {
                 // add/sub(register), unshifted form emitted by Simple
                 int rn = (ir >> 5)  & 0x1F;
                 int rm = (ir >> 16) & 0x1F;
-                long lhs = regs[rn];
-                long rhs = regs[rm];
+                // In the shifted-register form, register 31 is XZR, not SP
+                long lhs = rn==31 ? 0 : regs[rn];
+                long rhs = rm==31 ? 0 : regs[rm];
                 rval = opcode1==0x8B ? lhs + rhs : lhs - rhs;
                 break;
             }

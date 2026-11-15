@@ -58,7 +58,10 @@ public class Encoding {
             _op=op;  _t=t;  _off=off; _elf=elf;
         }
     }
-    public final HashMap<Node,Relo> _bigCons = new HashMap<>();
+    // Keyed by identity: Node.equals is value equality (for GVN), so two
+    // clones of the same constant would otherwise share one relocation and
+    // only one of them would get patched.
+    public final IdentityHashMap<Node,Relo> _bigCons = new IdentityHashMap<>();
 
     Encoding( CodeGen code ) { _code = code; }
 
@@ -441,8 +444,10 @@ public class Encoding {
 
         // radix sort the big constants by alignment
         Ary<Relo>[] raligns = new Ary[5];
-        for( Node op : _bigCons.keySet() ) {
-            Relo relo = _bigCons.get(op);
+        // Identity maps iterate in no fixed order; sort for a stable pool layout
+        Relo[] all = _bigCons.values().toArray(new Relo[0]);
+        Arrays.sort(all, (a,b) -> Integer.compare(a._op._nid,b._op._nid));
+        for( Relo relo : all ) {
             int align = relo._t.alignment();
             Ary<Relo> relos = raligns[align]==null ? (raligns[align]=new Ary<>(Relo.class)) : raligns[align];
             relos.add(relo);

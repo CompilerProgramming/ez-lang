@@ -319,6 +319,11 @@ public class arm extends Machine {
         short self = enc.reg(n);
         short reg1 = enc.reg(n2);
 
+        // ADD/SUB encode an unsigned magnitude; switch operation for a negative addend.
+        if( imm12<0 && (opcode==OPI_ADD || opcode==OPI_SUB) ) {
+            opcode ^= OPI_ADD ^ OPI_SUB;
+            imm12 = -imm12;
+        }
         int body = imm_inst(opcode, imm12&0xFFF, reg1, self);
         enc.add4(body);
     }
@@ -460,7 +465,9 @@ public class arm extends Machine {
 
     // share same encoding with LDR (literal, SIMD&FP) flavour
     public static int load_pc(int opcode, int offset, int rt) {
-        offset>>=2;
+        assert -(1<<20) <= offset && offset < (1<<20);
+        assert (offset&3)==0;
+        offset = (offset>>2)&0x7FFFF;
         return (opcode << 24) | (offset << 5) | rt;
     }
     // int l
@@ -514,7 +521,7 @@ public class arm extends Machine {
     public static void f_cmp(Encoding enc, Node n) {
         short reg1 = (short)(enc.reg(n.in(1))-D_OFFSET);
         short reg2 = (short)(enc.reg(n.in(2))-D_OFFSET);
-        int body = f_cmp(0b00011110, 3, reg1,  reg2);
+        int body = f_cmp(0b00011110, 3, reg2,  reg1);
         enc.add4(body);
     }
 
@@ -551,7 +558,7 @@ public class arm extends Machine {
         return opcode << 10 | rd << 5;
     }
     public static int b(int opcode, int delta) {
-        assert -(1<<26) <= delta && delta < (1<<26);
+        assert -(1<<27) <= delta && delta < (1<<27);
         assert (delta&3)==0;
         delta>>=2;
         delta &= (1L<<26)-1;    // Zero extend

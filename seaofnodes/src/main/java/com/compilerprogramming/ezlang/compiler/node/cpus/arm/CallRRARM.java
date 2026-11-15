@@ -2,10 +2,13 @@ package com.compilerprogramming.ezlang.compiler.node.cpus.arm;
 
 import com.compilerprogramming.ezlang.compiler.codegen.*;
 import com.compilerprogramming.ezlang.compiler.node.*;
+import com.compilerprogramming.ezlang.compiler.type.TypeFunPtr;
 import com.compilerprogramming.ezlang.compiler.util.SB;
 
 public class CallRRARM extends CallNode implements MachNode {
-    CallRRARM(CallNode call) { super(call); }
+    final TypeFunPtr _tfp;
+    CallRRARM(CallNode call) { super(call); _tfp = call.tfp(); }
+    @Override public TypeFunPtr tfp() { return _tfp; }
     @Override public String op() { return "callr"; }
     @Override public String label() { return op(); }
     @Override public RegMask regmap(int i) {
