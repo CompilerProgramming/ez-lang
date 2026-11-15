@@ -9,7 +9,7 @@ public class CallRRARM extends CallNode implements MachNode {
     @Override public String op() { return "callr"; }
     @Override public String label() { return op(); }
     @Override public RegMask regmap(int i) {
-        return i==_inputs._len
+        return i==_inputs._len-1
             ? arm.RMASK                // Function call target
             : arm.callInMask(tfp(),i,fun()._maxArgSlot); // Normal argument
     }
@@ -18,7 +18,7 @@ public class CallRRARM extends CallNode implements MachNode {
     @Override public void encoding( Encoding enc ) {
         // Needs a register, typically a jump-and-link-register opcode
         // blr
-        short self = enc.reg(this);
+        short self = enc.reg(fptr());
         enc.add4(arm.blr(arm.OP_CALLRARM, self));
     }
 

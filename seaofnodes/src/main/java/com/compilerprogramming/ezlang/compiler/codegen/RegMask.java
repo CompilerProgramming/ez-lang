@@ -97,8 +97,8 @@ public class RegMask {
 
     // Has exactly 1 bit set
     public boolean size1() {
-        return ((_bits0 & -_bits0)==_bits0 && _bits1==0) ||
-               ((_bits1 & -_bits1)==_bits1 && _bits0==0);
+        return !isEmpty() && (((_bits0 & -_bits0)==_bits0 && _bits1==0) ||
+                             ((_bits1 & -_bits1)==_bits1 && _bits0==0));
     }
 
     // Cardinality
