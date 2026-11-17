@@ -789,7 +789,6 @@ func foo(a: Int, b: Int)->Int {
     }
 
     @Test
-    @Ignore("Self-referential struct type recurses forever in TypeStruct.dual()")
     public void testFunction102() throws IOException {
         String src = """
                 struct Foo

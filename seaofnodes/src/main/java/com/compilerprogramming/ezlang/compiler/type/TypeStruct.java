@@ -38,14 +38,13 @@ public class TypeStruct extends Type {
     //public static final SONTypeStruct TEST = make("test",new Field[]{Field.TEST});
     // Forward-ref version
     public static TypeStruct makeFRef(String name) { return make(name, (Field[])null); }
-    // Make a read-only version
-    @Override public TypeStruct makeRO() {
-        if( isFinal() ) return this;
-        Field[] flds = new Field[_fields.length];
-        for( int i=0; i<flds.length; i++ )
-            flds[i] = _fields[i].makeRO();
-        return make(_name,flds);
-    }
+    // Struct types are nominal: interned by name alone, and never modified
+    // once created (apart from the one-time patch of a forward ref's fields).
+    // So a named struct has exactly one type, and the lattice operations
+    // below return it unchanged rather than building variants from the
+    // fields.  Rebuilding from the fields would also recurse forever on
+    // self-referential structs.
+    @Override public TypeStruct makeRO() { return this; }
 
     // Array
     public static TypeStruct makeAry(TypeInteger len, int lenAlias, Type body, int bodyAlias) {
@@ -54,15 +53,6 @@ public class TypeStruct extends Type {
         return make("[" + body.str() + "]",
                     Field.make("#" ,len , lenAlias,true ),
                     Field.make("[]",body,bodyAlias,false));
-    }
-    // Array
-    public static TypeStruct makeArray(TypeInteger len, int lenAlias, Type body, int bodyAlias) {
-        assert body instanceof TypeInteger || body instanceof TypeFloat || (body instanceof TypeNil tn && tn.nullable());
-        assert len.isa(TypeInteger.U32);
-        return new TypeStruct("[" + body.str() + "]",
-                new Field[] {
-                new Field("#" ,len , lenAlias,true ),
-                new Field("[]",body,bodyAlias,false) });
     }
 
     // A pair of self-cyclic types
@@ -112,48 +102,39 @@ public class TypeStruct extends Type {
         // And the answer is: "don't ask".
         if( !_name.equals(that._name) )
             return BOT;         // It's a struct; that's about all we know
-        if( this._fields==null ) return that;
-        if( that._fields==null ) return this;
-        if( _fields.length != that._fields.length ) return BOT;
-        // Just do field meets
-        Field[] flds = new Field[_fields.length];
-        for( int i=0; i<_fields.length; i++ ) {
-            Field f0 = _fields[i], f1 = that._fields[i];
-            if( !f0._fname.equals(f1._fname) || f0._alias != f1._alias )
-                return BOT;
-            flds[i] = (Field)f0.meet(f1);
-        }
-        return make(_name,flds);
+        // Same name means same nominal struct
+        assert this==that;
+        return this;
     }
 
     @Override
     public TypeStruct dual() {
         if( this==TOP ) return BOT;
         if( this==BOT ) return TOP;
-        if( _fields == null ) return this;
-        Field[] flds = new Field[_fields.length];
-        for( int i=0; i<_fields.length; i++ )
-            flds[i] = _fields[i].dual();
-        return make(_name,flds);
+        return this;            // Nominal: a named struct is its own dual
+//        if( _fields == null ) return this;
+//        Field[] flds = new Field[_fields.length];
+//        for( int i=0; i<_fields.length; i++ )
+//            flds[i] = _fields[i].dual();
+//        return make(_name,flds);
     }
 
-    // Keeps the same struct, but lower-bounds all fields.
     @Override public TypeStruct glb(boolean mem) {
-        if( _glb(mem) ) return this;
-        // Need to glb each field
-        Field[] flds = new Field[_fields.length];
-        for( int i=0; i<_fields.length; i++ )
-            flds[i] = _fields[i].glb(mem);
-        return make(_name,flds);
+        return this;
+//        if( _glb(mem) ) return this;
+//        // Need to glb each field
+//        Field[] flds = new Field[_fields.length];
+//        for( int i=0; i<_fields.length; i++ )
+//            flds[i] = _fields[i].glb(mem);
+//        return make(_name,flds);
     }
-    private boolean _glb(boolean mem) {
-        if( _fields!=null )
-          for( Field f : _fields )
-              if( f.glb(mem) != f )
-                 return false;
-        return true;
-    }
-
+//    private boolean _glb(boolean mem) {
+//        if( _fields!=null )
+//            for( Field f : _fields )
+//                if( f.glb(mem) != f )
+//                    return false;
+//        return true;
+//    }
     // Is forward-reference
     @Override public boolean isFRef() { return _fields==null; }
     // All fields are final

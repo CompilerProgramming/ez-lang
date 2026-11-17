@@ -167,7 +167,7 @@ public class Compiler {
         for (int i = 0; i < typeStruct.numFields(); i++) {
             String name = typeStruct.getFieldName(i);
             EZType type = typeStruct.getField(name); // FIXME
-            fs.push(new Field(name,getSONType(structTypes,type),_code.getALIAS(),false));
+            fs.push(Field.make(name,getSONType(structTypes,type),_code.getALIAS(),false));
         }
         // A Struct type may have been created before because of
         // reference from itself; in which case we need to update that
@@ -234,7 +234,7 @@ public class Compiler {
             Type elementType = getSONType(structTypes,typeArray.getElementType());
             if (elementType instanceof TypeMemPtr ptr && ptr.notNull())
                 throw new CompilerException("Array element reference types must be nullable", -1);
-            TypeStruct ts = TypeStruct.makeArray(TypeInteger.U32, _code.getALIAS(), elementType, _code.getALIAS());
+            TypeStruct ts = TypeStruct.makeAry(TypeInteger.U32, _code.getALIAS(), elementType, _code.getALIAS());
             TypeMemPtr ptr = TypeMemPtr.make((byte)2,ts);
             structTypes.put(typeArray.name(), ptr); // Array type name is not same as ptr str()
             return ptr;
