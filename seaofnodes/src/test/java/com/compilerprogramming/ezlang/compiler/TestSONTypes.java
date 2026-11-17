@@ -9,6 +9,7 @@ import com.compilerprogramming.ezlang.compiler.type.TypeMemPtr;
 import com.compilerprogramming.ezlang.compiler.type.TypeStruct;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.parser.ArrayInitLowerer;
 import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
 import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import org.junit.Before;
@@ -19,6 +20,7 @@ import java.io.IOException;
 
 import static com.compilerprogramming.ezlang.compiler.Main.PORTS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -984,7 +986,6 @@ func main()->Int
     }
 
     @Test
-    @Ignore("Array initializer value= is not compiled by the SoN front end")
     public void testFunction108() throws IOException {
         String src = """
                 func make(len: Int, val: Int)->[Int]
@@ -1004,6 +1005,69 @@ func main()->Int
                 }
                 """;
         runEmulators(src, "main", 0L);
+    }
+
+    @Test
+    public void testArrayValueInitWithExplicitElements() throws IOException {
+        // Explicit elements win; value= fills the rest
+        String src = """
+                func main()->Int
+                {
+                    var a = new [Int]{len=5, value=7, 1, 2}
+                    return a[0]*10000 + a[1]*1000 + a[2]*100 + a[3]*10 + a[4]
+                }
+                """;
+        runEmulators(src, "main", 12777L);
+    }
+
+    @Test
+    public void testArrayValueInitFloat() throws IOException {
+        String src = """
+                func main()->Int
+                {
+                    var a = new [Float]{len=3, value=2.5}
+                    if (a[2] == 2.5)
+                        return 1
+                    return 0
+                }
+                """;
+        runEmulators(src, "main", 1L);
+    }
+
+    @Test
+    public void testArrayValueInitNullableStruct() throws IOException {
+        String src = """
+                struct P { var x: Int }
+                func main()->Int
+                {
+                    var p = new P{x=9}
+                    var a = new [P?]{len=3, value=p}
+                    var q = a[2]
+                    if (q != null)
+                        return q.x
+                    return 0
+                }
+                """;
+        runEmulators(src, "main", 9L);
+    }
+
+    @Test
+    public void testArrayValueInitLowering() {
+        String src = """
+                func f(n: Int, v: Int)->Int
+                {
+                    var a = new [Int]{len=n, value=v}
+                    var z = new [Int]{len=n, value=0}
+                    return a[0] + z[0]
+                }
+                """;
+        Parser parser = new Parser();
+        var program = parser.parse(new Lexer(src));
+        ArrayInitLowerer.lower(program);
+        String lowered = program.toString();
+        // One fill loop for value=v; none for the zero fill
+        assertEquals(1, lowered.split("while", -1).length - 1);
+        assertFalse(lowered.contains("value="));
     }
 
     @Test

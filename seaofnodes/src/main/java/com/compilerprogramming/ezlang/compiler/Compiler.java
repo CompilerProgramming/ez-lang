@@ -9,6 +9,7 @@ import com.compilerprogramming.ezlang.exceptions.CompilerException;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.AST;
 import com.compilerprogramming.ezlang.parser.Parser;
+import com.compilerprogramming.ezlang.parser.ArrayInitLowerer;
 import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
 import com.compilerprogramming.ezlang.semantic.NullableAnalysis;
 import com.compilerprogramming.ezlang.semantic.SemaAssignTypes;
@@ -85,6 +86,8 @@ public class Compiler {
         analyze(program);
         // Lower boolean && and || to if blocks after nullable analysis has seen the original guards.
         ShortCircuitLowerer.lower(program);
+        // SoN allocations are zero filled; lower array value= to an explicit fill loop.
+        ArrayInitLowerer.lower(program);
         return bind(program);
     }
 
