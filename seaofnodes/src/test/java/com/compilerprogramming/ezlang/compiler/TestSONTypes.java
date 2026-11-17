@@ -3,6 +3,10 @@ package com.compilerprogramming.ezlang.compiler;
 import com.compilerprogramming.ezlang.compiler.codegen.CodeGen;
 import com.compilerprogramming.ezlang.compiler.node.cpus.arm.arm;
 import com.compilerprogramming.ezlang.compiler.node.cpus.riscv.riscv;
+import com.compilerprogramming.ezlang.compiler.type.Field;
+import com.compilerprogramming.ezlang.compiler.type.TypeInteger;
+import com.compilerprogramming.ezlang.compiler.type.TypeMemPtr;
+import com.compilerprogramming.ezlang.compiler.type.TypeStruct;
 import com.compilerprogramming.ezlang.lexer.Lexer;
 import com.compilerprogramming.ezlang.parser.Parser;
 import com.compilerprogramming.ezlang.parser.ShortCircuitLowerer;
@@ -15,9 +19,24 @@ import java.io.IOException;
 
 import static com.compilerprogramming.ezlang.compiler.Main.PORTS;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class TestSONTypes {
+
+    @Test
+    public void testNominalStructLattice() {
+        Field x = Field.make("x", TypeInteger.BOT, -1, false);
+        TypeStruct point = TypeStruct.make("NominalLatticePoint", x);
+        TypeStruct vector = TypeStruct.make("NominalLatticeVector", x);
+
+        assertSame(point, point.dual());
+        assertSame(TypeStruct.BOT, point.meet(vector));
+        assertSame(TypeStruct.TOP, point.join(vector));
+
+        TypeMemPtr nullable = TypeMemPtr.makeNullable(point);
+        assertSame(TypeMemPtr.make(point), nullable.join(nullable.nonZero()));
+    }
 
     String compileSrc(String src) {
         var compiler = new CodeGen(src);
