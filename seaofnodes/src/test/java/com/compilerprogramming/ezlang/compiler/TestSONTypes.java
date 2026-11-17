@@ -192,7 +192,6 @@ func foo()->Int {
 """);
     }
 
-    @Ignore("Bug in backend")
     @Test
     public void testArrayLoadNullCheckNarrowsNullableElement() {
         String src = """

@@ -353,6 +353,19 @@ public class ScopeNode extends MemMergeNode {
         // add pred & its cast to the normal input list, with special Vars
         if( pred==null || pred.isDead() )
             return;           // Dead, do not add any guards
+        _addGuards(ctrl,pred,invert);
+    }
+
+    private void _addGuards( Node ctrl, Node pred, boolean invert ) {
+        if( pred==null || pred.isDead() )
+            return;
+        // A single negation is handled below. For !!p (including p != null),
+        // also refine the underlying p without changing the Boolean result.
+        if( pred instanceof NotNode not && not.in(1) instanceof NotNode ) {
+            pred.keep();        // Recursive peepholes may rediscover this Not.
+            _addGuards(ctrl,not.in(1),!invert);
+            pred.unkeep();
+        }
         // Invert the If conditional
         if( invert )
             pred = pred instanceof NotNode not ? not.in(1) : new NotNode(pred).peephole();
