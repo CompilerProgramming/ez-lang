@@ -1532,4 +1532,51 @@ func main()->Int
         runEmulators(src, "main", 0L);
     }
 
+    @Test
+    public void testLoadBeforeConditionalStore() throws IOException {
+        // The load's only use is after the if; GCM must not sink it past the
+        // store on the true path (anti-dependence through the memory Phi).
+        String src = """
+                struct S { var x: Int }
+                func foo(s: S, c: Int)->Int {
+                    var v = s.x
+                    if (c)
+                        s.x = 2
+                    return v
+                }
+                func main()->Int {
+                    var s = new S{x=1}
+                    return foo(s,1)
+                }
+                """;
+        runEmulators(src, "main", 1L);
+    }
+
+    @Test
+    public void testLoadBeforeConditionalStoreInLoop() throws IOException {
+        // Same shape inside a loop: each iteration must read the value before
+        // the conditional store of that iteration.
+        String src = """
+                struct S { var x: Int }
+                func foo(s: S, n: Int)->Int {
+                    var sum = 0
+                    var i = 0
+                    while (i < n) {
+                        var v = s.x
+                        if (i == 1)
+                            s.x = 10
+                        sum = sum + v
+                        i = i + 1
+                    }
+                    return sum
+                }
+                func main()->Int {
+                    var s = new S{x=1}
+                    return foo(s,3)
+                }
+                """;
+        // Reads 1, 1, 10
+        runEmulators(src, "main", 12L);
+    }
+
 }

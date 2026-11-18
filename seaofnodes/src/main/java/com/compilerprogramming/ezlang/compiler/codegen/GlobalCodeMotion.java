@@ -291,10 +291,11 @@ public abstract class GlobalCodeMotion {
                 lca = anti_dep(load,late[call._nid],call.cfg0(),lca,call);
                 break;
             case PhiNode phi:
-                // Repeat anti-dep for matching Phi inputs.
-                // No anti-dep edges but may raise the LCA.
+                // Inputs carrying different memory might overwrite this alias.
+                // Raise the LCA for those paths; unchanged memory does not
+                // clobber the load. No scheduling edge to the Phi.
                 for( int i=1; i<phi.nIns(); i++ )
-                    if( phi.in(i)==load.mem() )
+                    if( phi.in(i)!=load.mem() )
                         lca = anti_dep(load,phi.region().cfg(i),load.mem().cfg0(),lca,null);
                 break;
             case NewNode st: break;
@@ -309,12 +310,18 @@ public abstract class GlobalCodeMotion {
 
     //
     private static CFGNode anti_dep( MemOpNode load, CFGNode stblk, CFGNode defblk, CFGNode lca, Node st ) {
-        // Store and Load overlap, need anti-dependence
-        if( stblk._anti==load._nid ) {
-            lca = stblk._idom(lca,null); // Raise Loads LCA
-            if( lca == stblk && st != null && st._inputs.find(load) == -1 ) // And if something moved,
-                st.addDef(load); // Add anti-dep as well
-            return lca;          // Cap this stores' anti-dep to here
+        // A conditional writer can precede the load without dominating its late block.
+        // Walk back to the first overlap with the load's placement range.
+        // Another Phi input need not be dominated by this memory definition.
+        // Include its depth, and retain the sentinel for an entry's null idom.
+        for( ; stblk != defblk.idom() && stblk.idepth() >= defblk.idepth(); stblk = stblk.idom() ) {
+            // Store and Load overlap, need anti-dependence
+            if( stblk._anti==load._nid ) {
+                lca = stblk._idom(lca,null); // Raise Loads LCA
+                if( lca == stblk && st != null && !(st instanceof CallNode) && st._inputs.find(load) == -1 ) // And if something moved,
+                    st.addDef(load);   // Add anti-dep as well; Calls already end their block.
+                return lca;            // Cap this stores' anti-dep to here
+            }
         }
         return lca;
     }
