@@ -71,16 +71,12 @@ public class RegMask {
                        : Long.numberOfTrailingZeros(_bits1)+64);
     }
     public short nextReg(short reg) {
-        if( reg<64 ) {
-            long bits0 = _bits0 >> (reg+1);
-            if( bits0!=0 )
-                return (short)(reg+1+Long.numberOfTrailingZeros(bits0));
-            reg=64;
+        if( reg < 63 ) {
+            long bits0 = _bits0 & (-1L << (reg+1));
+            if( bits0!=0 ) return (short)Long.numberOfTrailingZeros(bits0);
         }
-        long bits1 = _bits1 >> (reg-64+1);
-        if( bits1!=0 )
-            return (short)(reg+1+Long.numberOfTrailingZeros(bits1));
-        return -1;
+        long bits1 = reg < 64 ? _bits1 : reg < 127 ? _bits1 & (-1L << (reg-63)) : 0;
+        return bits1==0 ? -1 : (short)(64+Long.numberOfTrailingZeros(bits1));
     }
 
     boolean isEmpty() { return _bits0==0 && _bits1==0; }
